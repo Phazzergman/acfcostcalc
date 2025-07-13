@@ -5,15 +5,15 @@ import pandas as pd
 st.set_page_config(page_title="📦 ACF SKU Pricing Intelligence Dashboard", layout="wide")
 st.title("📦 ACF SKU Pricing Intelligence Dashboard")
 
-# Country toggle
+# Sidebar country toggle
 st.sidebar.header("Toggle Countries")
 countries = ["UK", "USA", "Germany"]
-country_toggle = {country: st.sidebar.checkbox(country, value=(country == "UK")) for country in countries}
+country_toggle = {c: st.sidebar.checkbox(c, value=(c == "UK")) for c in countries}
 
-# Sell-Through Duration (months)
+# Sell-through duration
 duration_months = st.sidebar.number_input("Sell-Through Duration (Months)", min_value=1, max_value=24, value=6)
 
-# Country-specific costs
+# Country-specific cost settings
 country_settings = {}
 for country in countries:
     if country_toggle[country]:
@@ -53,24 +53,20 @@ sku_data = [
     ["Alpha", "ASC2024", 501, 610, 20, 78.14, 100.49, 33],
     ["Alpha", "ASC2430", 610, 762, 20, 99.56, 128.04, 33],
 ]
-
-# Load into editable frame
 sku_df = pd.DataFrame(sku_data, columns=sku_columns)
-sku_df = st.data_editor(sku_df, num_rows="dynamic", use_container_width=True)
 
-# Auto-calculate Volume_m³
+# Calculate Volume
 sku_df["Volume_m³"] = (sku_df["Length_mm"] * sku_df["Width_mm"] * sku_df["Depth_mm"]) / 1_000_000_000
 
-# Calculate per-country pricing
+# Pricing Calculations
 for country in countries:
     if country_toggle[country]:
         rate = country_settings[country]["rate"]
         vat = country_settings[country]["vat"]
         monthly = country_settings[country]["monthly_costs"]
-        total_volume = country_settings[country]["container_volume"]
+        vol_total = country_settings[country]["container_volume"]
 
-        # Monthly cost allocation per SKU
-        cost_load = (monthly / total_volume) * sku_df["Volume_m³"] * duration_months
+        cost_load = (monthly / vol_total) * sku_df["Volume_m³"] * duration_months
         commission_factor = 1 + (sku_df["Commission_%"] / 100)
 
         landed = sku_df["Export_Cost_ZAR"] + cost_load
@@ -81,13 +77,18 @@ for country in countries:
         sku_df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
         sku_df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
 
-# Show final table with locked volume + dynamic pricing outputs
+# Lock calculated columns
+locked_cols = ["Volume_m³"]
+for country in countries:
+    if country_toggle[country]:
+        locked_cols += [
+            f"{country} Landed", f"{country} RRP exVAT", f"{country} RRP incVAT"
+        ]
+
+# Final editor
 st.data_editor(
     sku_df,
     use_container_width=True,
-    disabled=["Volume_m³"] + 
-             [f"{country} Landed" for country in countries if country_toggle[country]] +
-             [f"{country} RRP exVAT" for country in countries if country_toggle[country]] +
-             [f"{country} RRP incVAT" for country in countries if country_toggle[country]]
+    num_rows="dynamic",
+    disabled=locked_cols
 )
-
