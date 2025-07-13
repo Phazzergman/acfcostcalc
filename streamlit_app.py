@@ -1,7 +1,5 @@
-
 import streamlit as st
 import pandas as pd
-import numpy as np
 
 # Set Streamlit page config
 st.set_page_config(page_title="📦 ACF SKU Pricing Intelligence Dashboard", layout="wide")
@@ -12,10 +10,10 @@ st.sidebar.header("Toggle Countries")
 countries = ["UK", "USA", "Germany"]
 country_toggle = {country: st.sidebar.checkbox(country, value=(country == "UK")) for country in countries}
 
-# Global Sell-Through Duration
+# Sell-Through Duration (Months)
 duration_months = st.sidebar.number_input("Sell-Through Duration (Months)", min_value=1, max_value=24, value=6)
 
-# Country-specific settings
+# Country settings
 country_settings = {}
 for country in countries:
     if country_toggle[country]:
@@ -39,31 +37,34 @@ for country in countries:
             "monthly_costs": ads + bank + ops + ware + pack + courier,
         }
 
-# Editable SKU table (Category to Commission %)
+# Editable SKU table
 sku_columns = [
-    "Category", "SKU", "Length_mm", "Width_mm", "Depth_mm", "Volume_m³",
+    "Category", "SKU", "Length_mm", "Width_mm", "Depth_mm",
     "Factory_Cost_ZAR", "Export_Cost_ZAR", "Commission_%"
 ]
+
 sku_data = [
-    ["Alpha", "ASC68", 152, 203, 20, 0.0006, 16.79, 21.60, 33],
-    ["Alpha", "ASC1012", 255, 305, 20, 0.0016, 31.86, 40.97, 33],
-    ["Alpha", "ASC1014", 255, 355, 20, 0.0018, 35.22, 45.29, 33],
-    ["Alpha", "ASC1216", 305, 406, 20, 0.0025, 42.99, 55.28, 33],
-    ["Alpha", "ASC1418", 355, 457, 20, 0.0032, 53.51, 68.82, 33],
-    ["Alpha", "ASC1620", 406, 501, 20, 0.0041, 62.34, 80.17, 33],
-    ["Alpha", "ASC1824", 457, 610, 20, 0.0056, 73.20, 94.15, 33],
-    ["Alpha", "ASC2024", 501, 610, 20, 0.0061, 78.14, 100.49, 33],
-    ["Alpha", "ASC2430", 610, 762, 20, 0.0093, 99.56, 128.04, 33],
+    ["Alpha", "ASC68", 152, 203, 20, 16.79, 21.60, 33],
+    ["Alpha", "ASC1012", 255, 305, 20, 31.86, 40.97, 33],
+    ["Alpha", "ASC1014", 255, 355, 20, 35.22, 45.29, 33],
+    ["Alpha", "ASC1216", 305, 406, 20, 42.99, 55.28, 33],
+    ["Alpha", "ASC1418", 355, 457, 20, 53.51, 68.82, 33],
+    ["Alpha", "ASC1620", 406, 501, 20, 62.34, 80.17, 33],
+    ["Alpha", "ASC1824", 457, 610, 20, 73.20, 94.15, 33],
+    ["Alpha", "ASC2024", 501, 610, 20, 78.14, 100.49, 33],
+    ["Alpha", "ASC2430", 610, 762, 20, 99.56, 128.04, 33],
 ]
+
+# Load into DataFrame
 sku_df = pd.DataFrame(sku_data, columns=sku_columns)
+
+# Show editor (user can change sizes, costs, etc.)
 sku_df = st.data_editor(sku_df, num_rows="dynamic", use_container_width=True)
 
-# Dynamically recalculate volume based on dimensions
-sku_df["Volume_m³"] = (
-    sku_df["Length_mm"] * sku_df["Width_mm"] * sku_df["Depth_mm"] / 1_000_000_000
-).round(6)
+# Recalculate Volume_m³ from size fields
+sku_df["Volume_m³"] = (sku_df["Length_mm"] * sku_df["Width_mm"] * sku_df["Depth_mm"]) / 1_000_000_000
 
-# Pricing calculations
+# Pricing calculations per country
 for country in countries:
     if country_toggle[country]:
         rate = country_settings[country]["rate"]
@@ -71,7 +72,6 @@ for country in countries:
         monthly_costs = country_settings[country]["monthly_costs"]
         volume_total = country_settings[country]["container_volume"]
 
-        # Monthly cost per unit volume × SKU volume × months
         cost_load = (monthly_costs / volume_total) * sku_df["Volume_m³"] * duration_months
         commission_factor = 1 + (sku_df["Commission_%"] / 100)
 
@@ -83,3 +83,5 @@ for country in countries:
         sku_df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
         sku_df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
 
+# Final display
+st.dataframe(sku_df, use_container_width=True)
