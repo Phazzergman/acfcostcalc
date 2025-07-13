@@ -1,80 +1,86 @@
 import streamlit as st
-import pandas as pd
 
-st.set_page_config(page_title="ACF Master Price Calculator", layout="centered")
-st.title("🎯 ACF Canvas SKU Pricing Tool")
+st.set_page_config(page_title="ACF Multi-Country Pricing Calculator", layout="wide")
+st.title("🌍 ACF SKU Pricing Tool – Multi-Country Container Planner")
 
 st.markdown("""
-Use this tool to simulate **country-specific pricing**, based on:
-- SKU volume in **m³**
-- Monthly costs (ads, fulfilment, banking, etc.)
-- Manual RRP suggestions based on volume + country logic
-
-This version is **prototype-ready** with placeholder inputs set to 1 for now.
+This tool helps estimate country-specific RRP and margin based on your:
+- SKU size & cost in ZAR
+- Volume in m³
+- IP commissions
+- Container share
+- Country-specific shipping, VAT and operational costs
 """)
 
-# --- Fixed Product Inputs (Per SKU)
-st.header("📦 SKU Details (Fixed)")
+# --- Fixed SKU Info
+st.header("📦 SKU Info (Fixed across all countries)")
 sku = st.text_input("SKU Code", "SC1014")
 length = st.number_input("Length (mm)", value=255)
 width = st.number_input("Width (mm)", value=355)
 depth = st.number_input("Depth (mm)", value=20)
 
-volume_m3 = (length * width * depth) / 1_000_000_000  # Convert mm³ to m³
-st.write(f"**Volume (m³)**: `{volume_m3:.6f}`")
+volume_m3 = (length * width * depth) / 1_000_000_000
+st.write(f"**Volume (m³):** `{volume_m3:.6f}`")
 
-factory_cost_zar = st.number_input("ZAR Factory Cost per unit", value=1.0)
-export_cost_zar = st.number_input("ZAR Export Cost per unit", value=1.0)
-ip_commission_pct = st.number_input("IP Commission %", value=1.0)
+factory_cost_zar = st.number_input("Factory Cost (ZAR)", value=26.48)
+export_cost_zar = st.number_input("Export Cost (ZAR)", value=35.22)
+ip_commission_pct = st.number_input("IP Commission (%)", value=33.0)
+max_discount_pct = st.number_input("Max Discount (%)", value=10.0)
 
-# --- Fixed Country Settings
-st.header("🌍 Country Cost Factors (Fixed per Country)")
-col1, col2, col3 = st.columns(3)
-with col1:
-    country = st.selectbox("Destination Country", ["UK", "USA", "Germany"])
-with col2:
-    exchange_rate = st.number_input("Exchange Rate (ZAR → Local)", value=1.0)
-with col3:
-    vat_pct = st.number_input("VAT %", value=1.0)
+zar_total = factory_cost_zar + export_cost_zar
+zar_with_commission = zar_total * (1 + ip_commission_pct / 100)
 
-# Placeholder monthly cost values per country (will evolve later)
-st.subheader("📊 Monthly Country-Level Cost Drivers")
-advertising_monthly = st.number_input("Advertising Budget (Monthly)", value=1.0)
-banking_fees = st.number_input("Banking Cost (Monthly)", value=1.0)
-other_fees = st.number_input("Other Ops Cost (Monthly)", value=1.0)
-warehouse_cost = st.number_input("Warehousing (Monthly)", value=1.0)
-packing_cost = st.number_input("Packing Labour (Monthly)", value=1.0)
-courier_cost = st.number_input("Courier Cost per Unit", value=1.0)
+st.divider()
 
-# --- Per Unit Calculations
-st.header("💰 Price Engine")
-units_per_month = st.number_input("Expected Monthly Units Sold", value=1)
+# --- Country Configs
+st.header("🌐 Country-Specific Cost Inputs")
 
-# ZAR total cost
-total_cost_zar = factory_cost_zar + export_cost_zar
-commissioned_zar = total_cost_zar * (1 + ip_commission_pct / 100)
-converted_local_cost = commissioned_zar / exchange_rate
+countries = ["UK", "USA", "Germany"]
+country_data = {}
 
-# Shared overhead allocation
-total_monthly_overheads = advertising_monthly + banking_fees + other_fees + warehouse_cost + packing_cost
-per_unit_overhead = total_monthly_overheads / units_per_month if units_per_month else 0
+for country in countries:
+    st.subheader(f"🇨🇭 {country} Settings")
+    with st.expander(f"{country} Inputs", expanded=True):
+        exchange_rate = st.number_input(f"{country} Exchange Rate (ZAR → Local)", value=23.5, key=f"rate_{country}")
+        vat_pct = st.number_input(f"{country} VAT %", value=20.0, key=f"vat_{country}")
+        container_cost_zar = st.number_input(f"{country} Container Cost (ZAR)", value=156000.0, key=f"contcost_{country}")
+        container_volume = st.number_input(f"{country} Total Container Capacity (m³)", value=59.25, key=f"contvol_{country}")
 
-# Final cost per unit
-landed_total_cost = converted_local_cost + per_unit_overhead + courier_cost
+        # Monthly costs
+        ads = st.number_input(f"{country} Advertising (Monthly)", value=3000.0, key=f"ads_{country}")
+        banking = st.number_input(f"{country} Banking (Monthly)", value=250.0, key=f"bank_{country}")
+        other = st.number_input(f"{country} Other Ops Cost (Monthly)", value=400.0, key=f"other_{country}")
+        warehousing = st.number_input(f"{country} Warehousing (Monthly)", value=1000.0, key=f"ware_{country}")
+        packing_rate = st.number_input(f"{country} Packing Labour per unit", value=1.0, key=f"pack_{country}")
+        courier = st.number_input(f"{country} Courier per unit", value=7.5, key=f"cour_{country}")
+        monthly_units = st.number_input(f"{country} Monthly Sales Volume", value=1000.0, key=f"monthly_{country}")
 
-# Suggested RRP based on volume + markup
-markup_factor = 2.5  # Initial placeholder
-suggested_rrp_ex_vat = landed_total_cost * markup_factor
-vat_amount = suggested_rrp_ex_vat * (vat_pct / 100)
-suggested_rrp_incl_vat = suggested_rrp_ex_vat + vat_amount
+        # Cost Calculations
+        container_share = (volume_m3 / container_volume) * container_cost_zar if container_volume else 0
+        landed_zar = zar_with_commission + container_share
+        landed_local = landed_zar / exchange_rate if exchange_rate else 0
 
-# --- Output Summary
-st.subheader("💡 Suggested Price Summary")
-st.write(f"**Cost per Unit (Local)**: `{landed_total_cost:.2f}`")
-st.write(f"**Suggested RRP (Excl. VAT)**: `{suggested_rrp_ex_vat:.2f}`")
-st.write(f"**Suggested RRP (Incl. VAT)**: `{suggested_rrp_incl_vat:.2f}`")
+        monthly_overheads = (ads + banking + other + warehousing)
+        overhead_per_unit = monthly_overheads / monthly_units if monthly_units else 0
 
-if markup_factor < 2:
-    st.warning("⚠️ Markup too low – consider raising your prices.")
-elif markup_factor >= 2.5:
-    st.success("✅ Strong markup for sustainable margin.")
+        total_cost_local = landed_local + overhead_per_unit + packing_rate + courier
+        markup = 2.5
+        rrp_ex_vat = total_cost_local * markup
+        vat_amount = rrp_ex_vat * vat_pct / 100
+        rrp_incl_vat = rrp_ex_vat + vat_amount
+
+        profit = rrp_ex_vat - total_cost_local
+        margin_pct = (profit / rrp_ex_vat) * 100 if rrp_ex_vat else 0
+
+        st.markdown(f"**Final Cost (Local):** `{total_cost_local:.2f}`")
+        st.markdown(f"**Suggested RRP ex VAT:** `{rrp_ex_vat:.2f}`")
+        st.markdown(f"**Suggested RRP incl VAT:** `{rrp_incl_vat:.2f}`")
+        st.markdown(f"**Profit per unit:** `{profit:.2f}` | **Margin %:** `{margin_pct:.1f}%`")
+
+        country_data[country] = {
+            "cost": total_cost_local,
+            "rrp_ex_vat": rrp_ex_vat,
+            "rrp_incl_vat": rrp_incl_vat,
+            "profit": profit,
+            "margin": margin_pct
+        }
