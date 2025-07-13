@@ -58,6 +58,11 @@ sku_data = [
 sku_df = pd.DataFrame(sku_data, columns=sku_columns)
 sku_df = st.data_editor(sku_df, num_rows="dynamic", use_container_width=True)
 
+# Dynamically recalculate volume based on dimensions
+sku_df["Volume_m³"] = (
+    sku_df["Length_mm"] * sku_df["Width_mm"] * sku_df["Depth_mm"] / 1_000_000_000
+).round(6)
+
 # Pricing calculations
 for country in countries:
     if country_toggle[country]:
