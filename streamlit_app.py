@@ -18,7 +18,21 @@ countries = {
 # Global duration for container sell-through
 duration = st.sidebar.number_input("Expected container sell-through duration (months)", min_value=1, max_value=24, value=6)
 
-
+# Define inputs for each country
+for country in countries:
+    if countries[country]["visible"]:
+        with st.sidebar.expander(f"{country} Settings", expanded=True):
+            rate = st.number_input(f"{country} Exchange Rate (ZAR → Local)", value=25.0)
+            vat = st.number_input(f"{country} VAT %", value=0.2)
+            container_cost = st.number_input(f"{country} Container Cost (ZAR)", value=150000.0)
+            container_volume = st.number_input(f"{country} Container Capacity (m³)", value=95.29)
+            ads = st.number_input(f"{country} Advertising (Monthly)", value=3000.0)
+            bank = st.number_input(f"{country} Banking (Monthly)", value=1000.0)
+            ops = st.number_input(f"{country} Ops Cost (Monthly)", value=4000.0)
+            ware = st.number_input(f"{country} Warehousing (Monthly)", value=3000.0)
+            pack = st.number_input(f"{country} Packing per unit", value=1.0)
+            courier = st.number_input(f"{country} Courier per unit", value=7.5)
+            volume = st.number_input(f"{country} Monthly Sales Volume", value=1000.0)
 
         countries[country].update({
             "rate": rate, "vat": vat, "container_cost": container_cost,
