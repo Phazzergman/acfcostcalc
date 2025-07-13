@@ -1,89 +1,90 @@
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 
+# --- App setup
 st.set_page_config(page_title="ACF Multi-Country Pricing Grid", layout="wide")
+st.title("📦 ACF SKU Pricing Intelligence Dashboard")
 
-st.title("🧠 ACF SKU Pricing Intelligence Dashboard")
+# --- Country toggle
+country_toggles = {}
+countries = ["UK", "USA", "Germany"]
+with st.sidebar:
+    st.header("Toggle Countries")
+    for country in countries:
+        country_toggles[country] = st.checkbox(f"{country}", value=True)
 
-# Country visibility toggles
-show_uk = st.sidebar.checkbox("Show UK Settings", value=True)
-show_usa = st.sidebar.checkbox("Show USA Settings", value=True)
-show_germany = st.sidebar.checkbox("Show Germany Settings", value=True)
+# --- Country-specific inputs
+country_settings = {}
+for country in countries:
+    if not country_toggles[country]:
+        continue
+    with st.sidebar.expander(f"{country} Settings", expanded=True):
+        rate = st.number_input(f"{country} Exchange Rate (ZAR to Local)", value=19.5, key=f"rate_{country}")
+        vat = st.number_input(f"{country} VAT %", value=0.2, key=f"vat_{country}")
+        container_cost = st.number_input(f"{country} Container Cost (ZAR)", value=150000.0, key=f"contcost_{country}")
+        container_volume = st.number_input(f"{country} Container Capacity (m³)", value=95.25, key=f"contvol_{country}")
+        ads = st.number_input(f"{country} Advertising (Monthly)", value=3000.0, key=f"ads_{country}")
+        bank = st.number_input(f"{country} Banking (Monthly)", value=2000.0, key=f"bank_{country}")
+        ops = st.number_input(f"{country} Ops Cost (Monthly)", value=4000.0, key=f"ops_{country}")
+        ware = st.number_input(f"{country} Warehousing (Monthly)", value=10000.0, key=f"ware_{country}")
+        pack = st.number_input(f"{country} Packing per unit", value=1.00, key=f"pack_{country}")
+        courier = st.number_input(f"{country} Courier per unit", value=7.50, key=f"cour_{country}")
+        volume = st.number_input(f"{country} Monthly Units", value=1000.0, key=f"vol_{country}")
 
-country_inputs = {}
+    country_settings[country] = {
+        "rate": rate,
+        "vat": vat,
+        "container_cost": container_cost,
+        "container_volume": container_volume,
+        "ads": ads,
+        "bank": bank,
+        "ops": ops,
+        "ware": ware,
+        "pack": pack,
+        "courier": courier,
+        "volume": volume,
+    }
 
-if show_uk:
-    with st.sidebar.expander("🇬🇧 UK Settings"):
-        country_inputs["UK"] = {
-            "rate": st.number_input("UK Exchange Rate", value=24.0),
-            "vat": st.number_input("UK VAT %", value=20.0),
-            "container_cost": st.number_input("UK Container Cost (ZAR)", value=150000),
-            "container_volume": st.number_input("UK Container Capacity (m³)", value=95.2),
-            "ads": st.number_input("UK Advertising (Monthly)", value=2000),
-            "bank": st.number_input("UK Banking (Monthly)", value=2000),
-            "ops": st.number_input("UK Ops Cost (Monthly)", value=4000),
-            "warehouse": st.number_input("UK Warehousing (Monthly)", value=10000),
-            "pack": st.number_input("UK Packing per unit", value=1.0),
-            "courier": st.number_input("UK Courier per unit", value=7.99),
-            "volume": st.number_input("UK Monthly Units", value=10000),
-        }
+# --- SKU table toggle
+st.sidebar.markdown("---")
+use_custom_skus = st.sidebar.checkbox("Use Custom SKU Table", value=True)
 
-if show_usa:
-    with st.sidebar.expander("🇺🇸 USA Settings"):
-        country_inputs["USA"] = {
-            "rate": st.number_input("USA Exchange Rate", value=18.0),
-            "vat": st.number_input("USA VAT %", value=0.0),
-            "container_cost": st.number_input("USA Container Cost (ZAR)", value=150000),
-            "container_volume": st.number_input("USA Container Capacity (m³)", value=95.2),
-            "ads": st.number_input("USA Advertising (Monthly)", value=2000),
-            "bank": st.number_input("USA Banking (Monthly)", value=2000),
-            "ops": st.number_input("USA Ops Cost (Monthly)", value=4000),
-            "warehouse": st.number_input("USA Warehousing (Monthly)", value=10000),
-            "pack": st.number_input("USA Packing per unit", value=1.0),
-            "courier": st.number_input("USA Courier per unit", value=8.99),
-            "volume": st.number_input("USA Monthly Units", value=10000),
-        }
+# --- SKU Base Data
+if use_custom_skus:
+    default_data = {
+        "SKU": ["ASC68", "ASC1012", "ASC1014", "ASC1216", "ASC1418", "ASC1620", "ASC1824", "ASC2024", "ASC2430",
+                "ASC150", "ASC200", "ASC250", "ASC300", "ASC400", "ASC500",
+                "ASCA5", "ASCA4", "ASCA3", "ASCA2", "ASCA1"],
+        "Length_mm": [152, 255, 255, 305, 355, 406, 457, 501, 610, 150, 200, 250, 300, 400, 500, 148, 210, 297, 420, 594],
+        "Width_mm": [203, 305, 355, 406, 457, 501, 610, 610, 762, 150, 200, 250, 300, 400, 500, 210, 297, 420, 594, 841],
+        "Depth_mm": [20]*20,
+        "Factory_Cost_ZAR": [16.79, 31.86, 35.22, 42.99, 53.51, 62.34, 73.20, 78.14, 99.56,
+                             15.81, 21.50, 28.45, 34.81, 45.64, 64.18, 16.92, 28.05, 43.31, 71.76, 106.62],
+        "Export_Cost_ZAR": [21.60, 40.97, 45.29, 55.28, 68.82, 80.17, 94.15, 100.49, 128.04,
+                            20.34, 27.65, 36.59, 44.77, 58.70, 82.54, 21.76, 36.08, 55.70, 92.28, 137.13],
+    }
+    df = pd.DataFrame(default_data)
+else:
+    st.stop()
 
-if show_germany:
-    with st.sidebar.expander("🇩🇪 Germany Settings"):
-        country_inputs["Germany"] = {
-            "rate": st.number_input("Germany Exchange Rate", value=19.0),
-            "vat": st.number_input("Germany VAT %", value=19.0),
-            "container_cost": st.number_input("Germany Container Cost (ZAR)", value=150000),
-            "container_volume": st.number_input("Germany Container Capacity (m³)", value=95.2),
-            "ads": st.number_input("Germany Advertising (Monthly)", value=2000),
-            "bank": st.number_input("Germany Banking (Monthly)", value=2000),
-            "ops": st.number_input("Germany Ops Cost (Monthly)", value=4000),
-            "warehouse": st.number_input("Germany Warehousing (Monthly)", value=10000),
-            "pack": st.number_input("Germany Packing per unit", value=1.0),
-            "courier": st.number_input("Germany Courier per unit", value=9.99),
-            "volume": st.number_input("Germany Monthly Units", value=10000),
-        }
+# --- Volume Calculation
+df["Volume_m³"] = (df["Length_mm"] * df["Width_mm"] * df["Depth_mm"]) / 1e9
 
-# Sample data
-sku_data = {
-    "Category": ["Alpha"] * 5,
-    "SKU": [f"A-{i+1:02}" for i in range(5)],
-    "Length (mm)": [312, 485, 259, 385, 376],
-    "Width (mm)": [598, 245, 582, 212, 323],
-    "Depth (mm)": [20] * 5,
-    "Factory ZAR": [47.28, 27.29, 56.24, 40.48, 34.88],
-    "Export ZAR": [36.3, 48.93, 21.35, 47.49, 47.12],
-    "Commission %": [33] * 5,
-}
-
-df = pd.DataFrame(sku_data)
-
-# Pricing columns
-for country, inputs in country_inputs.items():
-    rate = inputs["rate"]
-    vat = inputs["vat"]
-    landed = df["Factory ZAR"] * rate / 100
-    rrp_exvat = landed * 2.5
-    rrp_incvat = rrp_exvat * (1 + vat / 100)
+# --- Pricing Calculations
+for country in countries:
+    if not country_toggles[country]:
+        continue
+    cs = country_settings[country]
+    landed = (df["Export_Cost_ZAR"] + cs["courier"] + cs["pack"] +
+              (cs["container_cost"] / cs["container_volume"]) * df["Volume_m³"] +
+              (cs["ads"] + cs["bank"] + cs["ops"] + cs["ware"]) / cs["volume"])
+    rrp_exvat = landed * cs["rate"]
+    rrp_incvat = rrp_exvat * (1 + cs["vat"])
     df[f"{country} Landed"] = landed.round(2)
     df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
     df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
 
-st.dataframe(df, use_container_width=True)
+# --- Display Table
+st.dataframe(df, use_container_width=True, hide_index=True)
