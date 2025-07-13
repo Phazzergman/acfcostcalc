@@ -81,9 +81,13 @@ for country in countries:
         sku_df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
         sku_df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
 
-# Final output: Volume locked, everything else editable
+# Show final table with locked volume + dynamic pricing outputs
 st.data_editor(
     sku_df,
     use_container_width=True,
-    disabled=["Volume_m³"]
+    disabled=["Volume_m³"] + 
+             [f"{country} Landed" for country in countries if country_toggle[country]] +
+             [f"{country} RRP exVAT" for country in countries if country_toggle[country]] +
+             [f"{country} RRP incVAT" for country in countries if country_toggle[country]]
 )
+
