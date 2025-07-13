@@ -82,6 +82,3 @@ for country in countries:
         sku_df[f"{country} Landed"] = landed.round(2)
         sku_df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
         sku_df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
-
-# Final display
-st.dataframe(sku_df, use_container_width=True)
