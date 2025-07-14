@@ -21,17 +21,18 @@ if "uk_history" not in st.session_state:
 
 # ---------- Sidebar Settings ----------
 st.sidebar.header("UK Settings")
-uk_rate = st.sidebar.number_input("Exchange Rate (ZAR → GBP)", value=19.0)
-uk_vat = st.sidebar.number_input("VAT %", value=20.0) / 100
-uk_months = st.sidebar.number_input("Sell-Through Duration (Months)", 1, 24, 6)
+uk_rate = st.sidebar.number_input("Exchange Rate (ZAR → GBP)", value=st.session_state.get("uk_rate", 19.0), key="uk_rate")
+uk_vat = st.sidebar.number_input("VAT % (e.g. 20 for 20%)", value=st.session_state.get("uk_vat", 20.0), key="uk_vat") / 100
+uk_months = st.sidebar.number_input("Sell-Through Duration (Months)", 1, 24, st.session_state.get("uk_months", 6), key="uk_months")
 
 st.sidebar.header("Monthly Costs")
-uk_ads = st.sidebar.number_input("Advertising", value=3000.0)
-uk_bank = st.sidebar.number_input("Banking", value=2000.0)
-uk_ops = st.sidebar.number_input("Ops Cost", value=4000.0)
-uk_ware = st.sidebar.number_input("Warehousing", value=10000.0)
-uk_pack = st.sidebar.number_input("Packing", value=6000.0)
-uk_cour = st.sidebar.number_input("Courier", value=7000.0)
+uk_ads = st.sidebar.number_input("Advertising", value=st.session_state.get("uk_ads", 3000.0), key="uk_ads")
+uk_bank = st.sidebar.number_input("Banking", value=st.session_state.get("uk_bank", 2000.0), key="uk_bank")
+uk_ops = st.sidebar.number_input("Ops Cost", value=st.session_state.get("uk_ops", 4000.0), key="uk_ops")
+uk_ware = st.sidebar.number_input("Warehousing", value=st.session_state.get("uk_ware", 10000.0), key="uk_ware")
+uk_pack = st.sidebar.number_input("Packing", value=st.session_state.get("uk_pack", 6000.0), key="uk_pack")
+uk_cour = st.sidebar.number_input("Courier", value=st.session_state.get("uk_cour", 7000.0), key="uk_cour")
+
 
 monthly_total = uk_ads + uk_bank + uk_ops + uk_ware + uk_pack + uk_cour
 
