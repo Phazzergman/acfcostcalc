@@ -42,38 +42,38 @@ for country in countries:
             "monthly_costs": ads + bank + ops + ware + pack + cour
         }
 
-# Base columns
+# Base columns (no Category)
 base_columns = [
     "SKU", "Length_mm", "Width_mm", "Depth_mm",
-    "Export_Cost_ZAR", "Imported_Cost_ZAR", "Commission_%", "MU_%"
+    "Export_Cost_ZAR", "Imported_Cost_ZAR", "Commission_%"
 ]
 
-# File for persistence
+# Local file persistence
 file_path = "sku_data.csv"
 
-# Load from file or initial
+# Load or start fresh
 if "sku_df" not in st.session_state:
     try:
         st.session_state.sku_df = pd.read_csv(file_path)
     except FileNotFoundError:
         st.session_state.sku_df = pd.DataFrame([
-            ["ASC1014", 289, 389, 20, 35.22, 0.18, 10, 0],
-            ["ASC1216", 305, 406, 20, 42.99, 0.20, 10, 0],
-            # Add other SKUs with 0 for Imported, Commission, MU
-            ["ASC608", 152, 203, 20, 16.79, 0.0, 10, 0],
-            ["ASC1012", 255, 305, 20, 31.86, 0.0, 10, 0],
-            ["ASC1418", 355, 457, 20, 53.51, 0.0, 10, 0],
-            ["ASC1620", 406, 501, 20, 62.34, 0.0, 10, 0],
-            ["ASC1824", 457, 610, 20, 73.20, 0.0, 10, 0],
-            ["ASC2024", 501, 610, 20, 78.14, 0.0, 10, 0],
-            ["ASC2430", 610, 762, 20, 99.56, 0.0, 10, 0],
+            ["ASC608", 152, 203, 20, 16.79, 0.0, 33],
+            ["ASC1012", 255, 305, 20, 31.86, 0.0, 33],
+            ["ASC1014", 255, 355, 20, 35.22, 0.18, 33],
+            ["ASC1216", 305, 406, 20, 42.99, 0.20, 33],
+            ["ASC1418", 355, 457, 20, 53.51, 0.0, 33],
+            ["ASC1620", 406, 501, 20, 62.34, 0.0, 33],
+            ["ASC1824", 457, 610, 20, 73.20, 0.0, 33],
+            ["ASC2024", 501, 610, 20, 78.14, 0.0, 33],
+            ["ASC2430", 610, 762, 20, 99.56, 0.0, 33],
         ], columns=base_columns)
-    st.session_state.history = []  # For undo
+    st.session_state.history = []
 
-# Define recalc function
+# Recalculate function
 def recalculate():
     df = st.session_state.sku_df.copy()
     df["Volume_m³"] = (df["Length_mm"] * df["Width_mm"] * df["Depth_mm"]) / 1_000_000_000
+
     for country in countries:
         if country_toggle[country] and country in country_settings:
             rate = country_settings[country]["rate"]
@@ -85,20 +85,21 @@ def recalculate():
             sku_monthly_cost = value_share * total_monthly_cost * duration_months
 
             total_ZAR = df["Export_Cost_ZAR"] + df["Imported_Cost_ZAR"]
-            landed = (total_ZAR / rate) + sku_monthly_cost + (df["Commission_%"] / 100 * (total_ZAR / rate))  # Added commission on converted base
+            landed = (total_ZAR / rate) + sku_monthly_cost
 
-            rrp_exvat = landed * (1 + df["MU_%"] / 100)
+            rrp_exvat = landed * (1 + df["Commission_%"] / 100)
             rrp_incvat = rrp_exvat * (1 + vat)
 
             df[f"{country} Landed"] = landed.round(2)
             df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
             df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
+
     st.session_state.sku_df = df
 
-# Recalc always after settings
+# Always recalc on load
 recalculate()
 
-# Handle buttons
+# Button actions
 if recalc_button:
     st.session_state.history.append(st.session_state.sku_df[base_columns].copy())
     if len(st.session_state.history) > 5:
@@ -114,23 +115,28 @@ if undo_button and st.session_state.history:
     recalculate()
     st.success("Undone to previous state!")
 
-# Selected countries
+# Country selection and final display
 selected_countries = [c for c in countries if country_toggle[c]]
+displayed_columns = base_columns + ["Volume_m³"] + sum([
+    [f"{c} Landed", f"{c} RRP exVAT", f"{c} RRP incVAT"]
+    for c in selected_countries
+    if f"{c} Landed" in st.session_state.sku_df.columns
+], [])
 
-# Displayed columns (removed Category)
-displayed_columns = base_columns + ["Volume_m³"] + sum([[f"{c} Landed", f"{c} RRP exVAT", f"{c} RRP incVAT"] for c in selected_countries if f"{c} Landed" in st.session_state.sku_df.columns], [])
-
-# Displayed DF
-displayed_df = st.session_state.sku_df[displayed_columns].copy()
-
-# Editor
+# Show editable table
 edited_df = st.data_editor(
-    displayed_df,
+    st.session_state.sku_df[displayed_columns],
     use_container_width=True,
     num_rows="dynamic",
-    disabled=["Volume_m³"] + sum([[f"{c} Landed", f"{c} RRP exVAT", f"{c} RRP incVAT"] for c in selected_countries], []),
+    disabled=["Volume_m³"] + [
+        f"{c} Landed" for c in selected_countries
+    ] + [
+        f"{c} RRP exVAT" for c in selected_countries
+    ] + [
+        f"{c} RRP incVAT" for c in selected_countries
+    ],
     hide_index=True
 )
 
-# Persist edits
+# Save changes live
 st.session_state.sku_df[base_columns] = edited_df[base_columns]
