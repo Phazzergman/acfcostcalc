@@ -1,92 +1,51 @@
 import streamlit as st
-import pandas as pd
-import copy
 
-st.set_page_config(layout="wide")
-st.title("GB UK SKU Pricing Intelligence Dashboard")
+st.title("ACF UK Pricing & Profitability Estimator")
 
-# --- SIDEBAR SETTINGS ---
-st.sidebar.header("UK Settings")
-exchange_rate = st.sidebar.number_input("Exchange Rate (ZAR → GBP)", value=24.00)
-vat_pct = st.sidebar.number_input("VAT %", value=0.00) / 100
-sell_through_months = st.sidebar.number_input("Sell-Through Duration (Months)", value=6)
+st.header("1. Base Costs")
+factory_cost = st.number_input("Factory cost per unit (in £):", value=4.17)
+shipping_cost = st.number_input("Shipping cost per unit (in £):", value=0.00)
+landed_cost = factory_cost + shipping_cost
+st.write(f"**Landed Cost (per unit):** £{landed_cost:.2f}")
 
-st.sidebar.header("Monthly Costs")
-monthly_costs = {
-    "Advertising": st.sidebar.number_input("Advertising", value=0.00),
-    "Banking": st.sidebar.number_input("Banking", value=0.00),
-    "Ops Cost": st.sidebar.number_input("Ops Cost", value=0.00),
-    "Warehousing": st.sidebar.number_input("Warehousing", value=0.00),
-    "Packing": st.sidebar.number_input("Packing", value=0.00),
-    "Courier": st.sidebar.number_input("Courier", value=0.00),
-}
+st.header("2. Commission")
+commission_percent = st.slider("Commission % (UK-based entity)", 0, 100, 20)
+commission_value = landed_cost * (commission_percent / 100)
+post_commission_cost = landed_cost + commission_value
+st.write(f"**Cost after Commission:** £{post_commission_cost:.2f}")
 
-# --- INITIAL DATA ---
-initial_data = pd.DataFrame([
-    {
-        "SKU": "ASC1014",
-        "Length_mm": 289,
-        "Width_mm": 389,
-        "Depth_mm": 20,
-        "Export_Cost_ZAR": 100.00,
-        "Imported_Cost_ZAR": 120.00,
-        "Commission_%": 10.0,
-        "Markup_%": 100.0,
-        "Volume_m3": 0.0022,
-    },
-    {
-        "SKU": "ASC1216",
-        "Length_mm": 305,
-        "Width_mm": 406,
-        "Depth_mm": 20,
-        "Export_Cost_ZAR": 42.99,
-        "Imported_Cost_ZAR": 0.00,
-        "Commission_%": 20.0,
-        "Markup_%": 50.0,
-        "Volume_m3": 0.0025,
-    }
-])
+st.header("3. Markup & Retail")
+markup_percent = st.slider("Markup %", 0, 300, 50)
+pre_vat_price = post_commission_cost * (1 + markup_percent / 100)
+st.write(f"**Price Before VAT:** £{pre_vat_price:.2f}")
 
-# --- SESSION STATE ---
-if "data" not in st.session_state:
-    st.session_state["data"] = initial_data.copy()
-    st.session_state["backup"] = copy.deepcopy(initial_data)
+vat_percent = st.slider("VAT %", 0, 30, 20)
+vat_value = pre_vat_price * (vat_percent / 100)
+final_price = pre_vat_price + vat_value
+st.write(f"**Final Price (incl. VAT):** £{final_price:.2f}")
 
-# --- BUTTONS ---
-col1, col2, col3 = st.columns([2, 1, 1])
-if col2.button("Save Changes"):
-    st.session_state["backup"] = st.session_state["data"].copy()
+st.header("4. Optional Monthly Costs")
+st.caption("These will be divided by units sold and added to monthly per-unit cost.")
+monthly_warehouse_cost = st.number_input("Monthly Warehousing (£):", value=0.0)
+monthly_handling_cost = st.number_input("Monthly Postage/Handling (£):", value=0.0)
+monthly_ad_cost = st.number_input("Monthly Advertising Spend (£):", value=0.0)
+units_sold_monthly = st.number_input("Estimated Monthly Units Sold:", value=1000)
 
-if col3.button("Undo"):
-    st.session_state["data"] = st.session_state["backup"].copy()
+if units_sold_monthly > 0:
+    warehouse_per_unit = monthly_warehouse_cost / units_sold_monthly
+    handling_per_unit = monthly_handling_cost / units_sold_monthly
+    ad_per_unit = monthly_ad_cost / units_sold_monthly
+    total_monthly_addon = warehouse_per_unit + handling_per_unit + ad_per_unit
 
-# --- RECALCULATE ---
-if col1.button("Recalculate"):
-    df = st.session_state["data"]
+    st.write(f"**Add-on per unit from monthly ops:** £{total_monthly_addon:.2f}")
+    adjusted_profit = final_price - post_commission_cost - total_monthly_addon
+    st.success(f"**Estimated Profit per Unit:** £{adjusted_profit:.2f}")
+else:
+    st.warning("Please input estimated units sold to calculate operational cost impact.")
 
-    # Convert ZAR to GBP using 1 / exchange rate
-    gbp_per_zar = 1 / exchange_rate
-    df["UK_Landed"] = df["Export_Cost_ZAR"] * gbp_per_zar
-
-    # Convert % fields properly (e.g. 10 = 10%)
-    df["Commission_GBP"] = df["UK_Landed"] * (df["Commission_%"] / 100)
-    df["RRP_exVAT"] = (df["UK_Landed"] + df["Commission_GBP"]) * (1 + df["Markup_%"] / 100)
-    df["RRP_incVAT"] = df["RRP_exVAT"] * (1 + vat_pct)
-
-    # Round for neatness
-    df[["UK_Landed", "Commission_GBP", "RRP_exVAT", "RRP_incVAT"]] = df[
-        ["UK_Landed", "Commission_GBP", "RRP_exVAT", "RRP_incVAT"]
-    ].round(4)
-
-    st.session_state["data"] = df
-    st.success("Recalculated based on latest inputs.")
-
-# --- DISPLAY EDITABLE TABLE ---
-st.subheader("📊 UK SKU Pricing")
-edited_df = st.data_editor(
-    st.session_state["data"],
-    num_rows="dynamic",
-    use_container_width=True
-)
-
-st.session_state["data"] = edited_df
+st.header("5. Exchange Rate (if needed)")
+use_forex = st.checkbox("Apply exchange rate?")
+if use_forex:
+    forex_rate = st.number_input("Exchange Rate (e.g. 1.20 for ZAR → GBP):", value=1.0)
+    local_price = final_price * forex_rate
+    st.write(f"**Local Price Equivalent:** {local_price:.2f} (based on rate)")
