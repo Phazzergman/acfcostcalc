@@ -37,28 +37,27 @@ for country in countries:
             "monthly_costs": ads + bank + ops + ware + pack + cour
         }
 
-# Base SKU data (for initial load)
+# Base columns
 base_columns = [
     "Category", "SKU", "Length_mm", "Width_mm", "Depth_mm",
     "Factory_Cost_ZAR", "Export_Cost_ZAR", "Commission_%"
 ]
-initial_data = [
-    ["Alpha", "ASC608", 152, 203, 20, 16.79, 21.60, 33],
-    ["Alpha", "ASC1012", 255, 305, 20, 31.86, 40.97, 33],
-    ["Alpha", "ASC1014", 255, 355, 20, 35.22, 45.29, 33],
-    ["Alpha", "ASC1216", 305, 406, 20, 42.99, 55.28, 33],
-    ["Alpha", "ASC1418", 355, 457, 20, 53.51, 68.82, 33],
-    ["Alpha", "ASC1620", 406, 501, 20, 62.34, 80.17, 33],
-    ["Alpha", "ASC1824", 457, 610, 20, 73.20, 94.15, 33],
-    ["Alpha", "ASC2024", 501, 610, 20, 78.14, 100.49, 33],
-    ["Alpha", "ASC2430", 610, 762, 20, 99.56, 128.04, 33],
-]
 
-# Session state for DF persistence
+# Initial data if not in session
 if "sku_df" not in st.session_state:
-    st.session_state.sku_df = pd.DataFrame(initial_data, columns=base_columns)
+    st.session_state.sku_df = pd.DataFrame([
+        ["Alpha", "ASC608", 152, 203, 20, 16.79, 21.60, 33],
+        ["Alpha", "ASC1012", 255, 305, 20, 31.86, 40.97, 33],
+        ["Alpha", "ASC1014", 255, 355, 20, 35.22, 45.29, 33],
+        ["Alpha", "ASC1216", 305, 406, 20, 42.99, 55.28, 33],
+        ["Alpha", "ASC1418", 355, 457, 20, 53.51, 68.82, 33],
+        ["Alpha", "ASC1620", 406, 501, 20, 62.34, 80.17, 33],
+        ["Alpha", "ASC1824", 457, 610, 20, 73.20, 94.15, 33],
+        ["Alpha", "ASC2024", 501, 610, 20, 78.14, 100.49, 33],
+        ["Alpha", "ASC2430", 610, 762, 20, 99.56, 128.04, 33],
+    ], columns=base_columns)
 
-# Calculate volume and pricing on current DF (auto before display)
+# Calculate volume and pricing
 st.session_state.sku_df["Volume_m³"] = (
     st.session_state.sku_df["Length_mm"] * 
     st.session_state.sku_df["Width_mm"] * 
@@ -89,7 +88,7 @@ for country in countries:
         st.session_state.sku_df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
         st.session_state.sku_df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
 
-# Display single editor with calculated DF
+# Display and edit the DF
 edited_df = st.data_editor(
     st.session_state.sku_df,
     use_container_width=True,
@@ -100,5 +99,5 @@ edited_df = st.data_editor(
     hide_index=True
 )
 
-# Update session state with only base edits (strip calculated for next run)
-st.session_state.sku_df = edited_df[base_columns]
+# Persist only base edits for next rerun
+st.session_state.sku_df[base_columns] = edited_df[base_columns]
