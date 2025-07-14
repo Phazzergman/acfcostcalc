@@ -46,8 +46,8 @@ def recalc_uk():
     df["RRP_exVAT"] = df["UK_Landed"] * (1 + df["Commission_%"] / 100 + df["Markup_%"] / 100)
     df["RRP_incVAT"] = df["RRP_exVAT"] * (1 + uk_vat)
     df["RRP_exVAT"] = df["RRP_exVAT"].round(2)
-df["RRP_incVAT"] = df["RRP_incVAT"].round(2)
-return df.round(4)
+    df["RRP_incVAT"] = df["RRP_incVAT"].round(2)
+    return df.round(4)
 
 
 # ---------- Buttons ----------
