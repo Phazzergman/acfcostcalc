@@ -29,8 +29,6 @@ for country in countries:
         with st.sidebar.expander(f"{country} Settings", expanded=True):
             rate = st.number_input(f"{country} Exchange Rate (ZAR → Local)", value=19.0, key=f"rate_{country}")
             vat = st.number_input(f"{country} VAT %", value=0.20, key=f"vat_{country}")
-            cont_cost = st.number_input(f"{country} Container Cost (ZAR)", value=150000.0, key=f"contcost_{country}")
-            cont_vol = st.number_input(f"{country} Container Volume (m³)", value=95.25, key=f"contvol_{country}")
             ads = st.number_input(f"{country} Advertising (Monthly)", value=3000.0, key=f"ads_{country}")
             bank = st.number_input(f"{country} Banking (Monthly)", value=2000.0, key=f"bank_{country}")
             ops = st.number_input(f"{country} Ops Cost (Monthly)", value=4000.0, key=f"ops_{country}")
@@ -41,8 +39,6 @@ for country in countries:
         country_settings[country] = {
             "rate": rate,
             "vat": vat,
-            "container_cost": cont_cost,
-            "container_volume": cont_vol,
             "monthly_costs": ads + bank + ops + ware + pack + cour
         }
 
@@ -82,12 +78,9 @@ def recalculate():
             rate = country_settings[country]["rate"]
             vat = country_settings[country]["vat"]
             monthly = country_settings[country]["monthly_costs"]
-            vol_total = country_settings[country]["container_volume"]
-            cont_cost = country_settings[country]["container_cost"]
 
-            cost_load = (monthly / vol_total) * df["Volume_m³"] * duration_months
-            shipping_ZAR = cont_cost * df["Volume_m³"] / vol_total
-            total_ZAR = df["Factory_Cost_ZAR"] + df["Export_Cost_ZAR"] + shipping_ZAR
+            cost_load = (monthly / df["Volume_m³"].sum()) * df["Volume_m³"] * duration_months  # Adjusted for no container volume
+            total_ZAR = df["Factory_Cost_ZAR"] + df["Export_Cost_ZAR"]  # Removed shipping
             landed = (total_ZAR / rate) + cost_load
             commission_factor = 1 + (df["Commission_%"] / 100)
             rrp_exvat = landed * commission_factor
@@ -136,21 +129,3 @@ edited_df = st.data_editor(
 
 # Persist edits
 st.session_state.sku_df[base_columns] = edited_df[base_columns]
-
-# CSS for shades of grey background on columns
-st.markdown("""
-<style>
-div[data-testid="stDataFrameResizable"] th, div[data-testid="stDataFrameResizable"] td {
-  padding: 10px;
-}
-div[data-testid="stDataFrameResizable"] [title^="UK"] ~ td, div[data-testid="stDataFrameResizable"] [title^="UK"] {
-  background-color: #f0f0f0 !important; /* Light grey for UK columns */
-}
-div[data-testid="stDataFrameResizable"] [title^="USA"] ~ td, div[data-testid="stDataFrameResizable"] [title^="USA"] {
-  background-color: #d0d0d0 !important; /* Medium grey for USA */
-}
-div[data-testid="stDataFrameResizable"] [title^="Germany"] ~ td, div[data-testid="stDataFrameResizable"] [title^="Germany"] {
-  background-color: #b0b0b0 !important; /* Dark grey for Germany */
-}
-</style>
-""", unsafe_allow_html=True)
