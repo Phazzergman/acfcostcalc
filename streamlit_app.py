@@ -22,7 +22,7 @@ if "uk_history" not in st.session_state:
 # ---------- Sidebar Settings ----------
 st.sidebar.header("UK Settings")
 uk_rate = st.sidebar.number_input("Exchange Rate (ZAR → GBP)", value=19.0)
-uk_vat = st.sidebar.number_input("VAT %", value=0.20)
+uk_vat = st.sidebar.number_input("VAT %", value=20.0) / 100
 uk_months = st.sidebar.number_input("Sell-Through Duration (Months)", 1, 24, 6)
 
 st.sidebar.header("Monthly Costs")
