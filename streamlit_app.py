@@ -5,13 +5,23 @@ import pandas as pd
 st.set_page_config(page_title="📦 ACF SKU Pricing Intelligence Dashboard", layout="wide")
 st.title("📦 ACF SKU Pricing Intelligence Dashboard")
 
+# Buttons in main page, above table
+col1, col2, col3 = st.columns(3)
+with col1:
+    recalc_button = st.button("Recalculate")
+with col2:
+    save_button = st.button("Save Changes")
+with col3:
+    undo_button = st.button("Undo")
+
 # Sidebar country toggle
 st.sidebar.header("Toggle Countries")
 countries = ["UK", "USA", "Germany"]
 country_toggle = {c: st.sidebar.checkbox(c, value=(c == "UK")) for c in countries}
 
 # Sell-through duration
-duration_months = st.sidebar.number_input("Sell-Through Duration (Months)", min_value=1, max_value=24, value=6)
+st.sidebar.number_input("Sell-Through Duration (Months)", min_value=1, max_value=24, value=6, key="duration_months")
+duration_months = st.session_state.duration_months
 
 # Country-specific settings
 country_settings = {}
@@ -36,12 +46,6 @@ for country in countries:
             "container_volume": cont_vol,
             "monthly_costs": ads + bank + ops + ware + pack + cour
         }
-
-# Actions buttons
-st.sidebar.header("Actions")
-recalc_button = st.sidebar.button("Recalculate")
-save_button = st.sidebar.button("Save Changes")
-undo_button = st.sidebar.button("Undo")
 
 # Base columns
 base_columns = [
