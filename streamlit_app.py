@@ -42,7 +42,7 @@ def recalc_uk():
     total_volume = df["Volume_m3"].sum()
     monthly_per_m3 = (monthly_total / total_volume) * uk_months
 
-    df["UK_Landed"] = ((df["Imported_Cost_ZAR"] + df["Export_Cost_ZAR"]) / uk_rate) + (df["Volume_m3"] * monthly_per_m3)
+    df["UK_Landed"] = (df["Imported_Cost_ZAR"] / uk_rate) + (df["Volume_m3"] * monthly_per_m3)
     df["RRP_exVAT"] = df["UK_Landed"] * (1 + df["Commission_%"] / 100 + df["Markup_%"] / 100)
     df["RRP_incVAT"] = df["RRP_exVAT"] * (1 + uk_vat)
     return df.round(4)
