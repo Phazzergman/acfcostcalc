@@ -1,71 +1,93 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="ACF UK Pricing Estimator", layout="wide")
+# Set page config
+st.set_page_config(page_title="ACF SKU Pricing Intelligence Dashboard", layout="wide")
 
-st.title("ACF UK Pricing & Profitability Estimator")
+# Session state initialization
+if "df_backup" not in st.session_state:
+    st.session_state.df_backup = None
 
-# Sidebar Inputs
-st.sidebar.header("Global Inputs")
+# Sidebar - Toggle Countries and Global Settings
+st.sidebar.title("Toggle Countries")
+country_selected = st.sidebar.checkbox("UK", value=True)
+st.sidebar.markdown("---")
 
-exchange_rate = st.sidebar.number_input("Exchange Rate (ZAR to GBP)", value=1.20)
-commission_percent = st.sidebar.number_input("Commission % (UK entity)", value=20.0)
-markup_percent = st.sidebar.number_input("Markup %", value=50.0)
-vat_percent = st.sidebar.number_input("VAT %", value=20.0)
+sell_through_months = st.sidebar.number_input("Sell-Through Duration (Months)", min_value=1, value=6)
 
-monthly_warehouse_cost = st.sidebar.number_input("Monthly Warehousing (£)", value=0.0)
-monthly_handling_cost = st.sidebar.number_input("Monthly Handling (£)", value=0.0)
-monthly_ad_cost = st.sidebar.number_input("Monthly Advertising (£)", value=0.0)
-estimated_units_sold = st.sidebar.number_input("Estimated Units Sold per Month", value=1000)
+# UK Settings
+st.sidebar.subheader("UK Settings")
+st.session_state.uk_exchange_rate = st.sidebar.number_input("UK Exchange Rate (ZAR ➔ Local)", value=19.0)
+st.session_state.uk_vat = st.sidebar.number_input("UK VAT %", value=0.20)
+uk_container_cost = st.sidebar.number_input("UK Container Cost (ZAR)", value=150000.0)
+uk_container_volume = st.sidebar.number_input("UK Container Volume (m³)", value=95.25)
 
-# Simulated SKU input table (replace with your own table logic)
-st.subheader("Container SKUs and Costs")
+# Monthly Costs
+st.session_state.uk_advertising = st.sidebar.number_input("UK Advertising (Monthly)", value=3000.0)
+st.session_state.uk_banking = st.sidebar.number_input("UK Banking (Monthly)", value=2000.0)
+st.session_state.uk_ops = st.sidebar.number_input("UK Ops Cost (Monthly)", value=4000.0)
+st.session_state.uk_warehousing = st.sidebar.number_input("UK Warehousing (Monthly)", value=10000.0)
+st.session_state.uk_packing = st.sidebar.number_input("UK Packing (Monthly)", value=6000.0)
+st.session_state.uk_courier = st.sidebar.number_input("UK Courier (Monthly)", value=7000.0)
 
+# Initialize Data
 data = {
-    "SKU": ["ABC123", "DEF456", "GHI789"],
-    "Volume %": [0.25, 0.35, 0.40],
-    "Factory Cost (£)": [3.50, 4.00, 4.50],
-    "Shipping (£)": [0.67, 0.85, 1.00]
+    "SKU": ["ASC608", "ASC1012", "ASC1014", "ASC1216", "ASC1418", "ASC1620", "ASC1824", "ASC2024", "ASC2430"],
+    "Length_mm": [200, 255, 255, 305, 355, 406, 457, 501, 610],
+    "Width_mm": [1000, 305, 355, 406, 457, 501, 610, 610, 762],
+    "Depth_mm": [1000, 20, 20, 20, 20, 20, 20, 20, 20],
+    "Factory_Cost_ZAR": [16.79, 31.86, 35.22, 42.99, 53.51, 62.34, 73.2, 78.14, 99.56],
+    "Export_Cost_ZAR": [255, 355, 402, 495, 621, 749, 940, 1009, 1284],
+    "Commission_%": [33] * 9,
+    "Volume_m³": [0.2, 0.0016, 0.0018, 0.0025, 0.0032, 0.0041, 0.0056, 0.0061, 0.0093],
 }
 
 df = pd.DataFrame(data)
-df["Landed Cost (£)"] = df["Factory Cost (£)"] + df["Shipping (£)"]
-df["Commission (£)"] = df["Landed Cost (£)"] * (commission_percent / 100)
-df["Post-Commission (£)"] = df["Landed Cost (£)"] + df["Commission (£)"]
-df["Pre-VAT Price (£)"] = df["Post-Commission (£)"] * (1 + markup_percent / 100)
-df["VAT (£)"] = df["Pre-VAT Price (£)"] * (vat_percent / 100)
-df["RRP incl VAT (£)"] = df["Pre-VAT Price (£)"] + df["VAT (£)"]
 
-# Optional operational add-ons per unit
-if estimated_units_sold > 0:
-    op_costs_per_unit = (
-        monthly_warehouse_cost + monthly_handling_cost + monthly_ad_cost
-    ) / estimated_units_sold
-else:
-    op_costs_per_unit = 0.0
+# Button interactions
+col1, col2, col3 = st.columns([1, 1, 1])
+recalculate = col1.button("Recalculate")
+save = col2.button("Save Changes")
+undo = col3.button("Undo")
 
-df["Total Cost + Ops (£)"] = df["Post-Commission (£)"] + op_costs_per_unit
-df["Profit per Unit (£)"] = df["RRP incl VAT (£)"] - df["Total Cost + Ops (£)"]
+# Backup before recalculation
+if recalculate:
+    st.session_state.df_backup = df.copy()
+
+    # Constants
+    exchange_rate = st.session_state.uk_exchange_rate
+    vat_rate = st.session_state.uk_vat
+    commission_rate = 0.33
+    markup_rate = 0.50
+    monthly_costs = (
+        st.session_state.uk_advertising +
+        st.session_state.uk_banking +
+        st.session_state.uk_ops +
+        st.session_state.uk_warehousing +
+        st.session_state.uk_packing +
+        st.session_state.uk_courier
+    )
+    monthly_cost_per_m3 = monthly_costs / sell_through_months
+
+    # Calculations
+    for i, row in df.iterrows():
+        volume_m3 = row["Volume_m³"]
+        export_cost_zar = row["Export_Cost_ZAR"]
+        export_cost_gbp = export_cost_zar / exchange_rate
+        cost_with_commission = export_cost_gbp * (1 + commission_rate)
+        operational_cost = monthly_cost_per_m3 * volume_m3
+        landed_total_cost = cost_with_commission + operational_cost
+        rrp_ex_vat = landed_total_cost * (1 + markup_rate)
+        rrp_incl_vat = rrp_ex_vat * (1 + vat_rate)
+
+        df.at[i, "UK Landed"] = round(landed_total_cost, 2)
+        df.at[i, "UK RRP exVAT"] = round(rrp_ex_vat, 2)
+        df.at[i, "UK RRP incVAT"] = round(rrp_incl_vat, 2)
+
+# Undo changes
+if undo and st.session_state.df_backup is not None:
+    df = st.session_state.df_backup.copy()
 
 # Display table
-st.markdown("### 📦 SKU Pricing Table")
-st.dataframe(df.style.format({
-    "Factory Cost (£)": "£{:.2f}",
-    "Shipping (£)": "£{:.2f}",
-    "Landed Cost (£)": "£{:.2f}",
-    "Commission (£)": "£{:.2f}",
-    "Post-Commission (£)": "£{:.2f}",
-    "Pre-VAT Price (£)": "£{:.2f}",
-    "VAT (£)": "£{:.2f}",
-    "RRP incl VAT (£)": "£{:.2f}",
-    "Total Cost + Ops (£)": "£{:.2f}",
-    "Profit per Unit (£)": "£{:.2f}",
-}), use_container_width=True)
-
-# Summary
-st.markdown("### 🧾 Summary")
-total_profit = df["Profit per Unit (£)"].sum()
-avg_profit = df["Profit per Unit (£)"].mean()
-st.success(f"Average Profit per SKU: £{avg_profit:.2f}")
-st.info(f"Total Combined Profit: £{total_profit:.2f}")
-
+st.title("📦 ACF SKU Pricing Intelligence Dashboard")
+st.dataframe(df, use_container_width=True)
