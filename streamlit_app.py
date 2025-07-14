@@ -18,6 +18,12 @@ monthly_handling_cost = st.sidebar.number_input("Monthly Handling (£)", value=0
 monthly_ad_cost = st.sidebar.number_input("Monthly Advertising (£)", value=0.0)
 estimated_units_sold = st.sidebar.number_input("Estimated Units Sold per Month", value=1000)
 
+# Buttons
+col1, col2, col3 = st.columns([1, 1, 1])
+recalculate = col1.button("Recalculate")
+save = col2.button("Save Changes")
+undo = col3.button("Undo")
+
 # Simulated SKU input table (replace with your own table logic)
 st.subheader("Container SKUs and Costs")
 
@@ -28,26 +34,41 @@ data = {
     "Shipping (£)": [0.67, 0.85, 1.00]
 }
 
-df = pd.DataFrame(data)
-df["Landed Cost (£)"] = df["Factory Cost (£)"] + df["Shipping (£)"]
-df["Commission (£)"] = df["Landed Cost (£)"] * (commission_percent / 100)
-df["Post-Commission (£)"] = df["Landed Cost (£)"] + df["Commission (£)"]
-df["Pre-VAT Price (£)"] = df["Post-Commission (£)"] * (1 + markup_percent / 100)
-df["VAT (£)"] = df["Pre-VAT Price (£)"] * (vat_percent / 100)
-df["RRP incl VAT (£)"] = df["Pre-VAT Price (£)"] + df["VAT (£)"]
+if "df" not in st.session_state:
+    st.session_state.df = pd.DataFrame(data)
 
-# Optional operational add-ons per unit
-if estimated_units_sold > 0:
-    op_costs_per_unit = (
-        monthly_warehouse_cost + monthly_handling_cost + monthly_ad_cost
-    ) / estimated_units_sold
-else:
-    op_costs_per_unit = 0.0
+if "df_backup" not in st.session_state:
+    st.session_state.df_backup = None
 
-df["Total Cost + Ops (£)"] = df["Post-Commission (£)"] + op_costs_per_unit
-df["Profit per Unit (£)"] = df["RRP incl VAT (£)"] - df["Total Cost + Ops (£)"]
+# Backup
+if recalculate:
+    st.session_state.df_backup = st.session_state.df.copy()
+
+    df = st.session_state.df.copy()
+    df["Landed Cost (£)"] = df["Factory Cost (£)"] + df["Shipping (£)"]
+    df["Commission (£)"] = df["Landed Cost (£)"] * (commission_percent / 100)
+    df["Post-Commission (£)"] = df["Landed Cost (£)"] + df["Commission (£)"]
+    df["Pre-VAT Price (£)"] = df["Post-Commission (£)"] * (1 + markup_percent / 100)
+    df["VAT (£)"] = df["Pre-VAT Price (£)"] * (vat_percent / 100)
+    df["RRP incl VAT (£)"] = df["Pre-VAT Price (£)"] + df["VAT (£)"]
+
+    if estimated_units_sold > 0:
+        op_costs_per_unit = (
+            monthly_warehouse_cost + monthly_handling_cost + monthly_ad_cost
+        ) / estimated_units_sold
+    else:
+        op_costs_per_unit = 0.0
+
+    df["Total Cost + Ops (£)"] = df["Post-Commission (£)"] + op_costs_per_unit
+    df["Profit per Unit (£)"] = df["RRP incl VAT (£)"] - df["Total Cost + Ops (£)"]
+
+    st.session_state.df = df.copy()
+
+if undo and st.session_state.df_backup is not None:
+    st.session_state.df = st.session_state.df_backup.copy()
 
 # Display table
+df = st.session_state.df
 st.markdown("### 📦 SKU Pricing Table")
 st.dataframe(df.style.format({
     "Factory Cost (£)": "£{:.2f}",
@@ -68,4 +89,3 @@ total_profit = df["Profit per Unit (£)"].sum()
 avg_profit = df["Profit per Unit (£)"].mean()
 st.success(f"Average Profit per SKU: £{avg_profit:.2f}")
 st.info(f"Total Combined Profit: £{total_profit:.2f}")
-
