@@ -22,59 +22,57 @@ monthly_costs = {
 }
 total_monthly_costs = sum(monthly_costs.values())
 
-# SKU Input Columns
+# Define SKU input columns
 base_columns = [
     "SKU", "Length_mm", "Width_mm", "Depth_mm",
     "Export_Cost_ZAR", "Imported_Cost_ZAR", "Commission_%", "Markup_%"
 ]
 
-file_path = "uk_sku_data.csv"
-
-# Load or initialize
+# Initial session setup
 if "uk_sku_df" not in st.session_state:
-    try:
-        st.session_state.uk_sku_df = pd.read_csv(file_path)
-    except FileNotFoundError:
-        st.session_state.uk_sku_df = pd.DataFrame([
-            ["ASC1014", 289, 389, 20, 35.22, 0.18, 0.1, 10],
-            ["ASC1216", 305, 406, 20, 42.99, 0.20, 1.99, 10]
-        ], columns=base_columns)
+    st.session_state.uk_sku_df = pd.DataFrame([
+        ["ASC1014", 289, 389, 20, 35.22, 0.18, 0.1, 10],
+        ["ASC1216", 305, 406, 20, 42.99, 0.20, 1.99, 10]
+    ], columns=base_columns)
+
+if "uk_history" not in st.session_state:
     st.session_state.uk_history = []
 
-# Calculated Columns
-df = st.session_state.uk_sku_df.copy()
-df["Volume_m3"] = (df["Length_mm"] * df["Width_mm"] * df["Depth_mm"]) / 1_000_000_000
-cost_load = (total_monthly_costs / df["Volume_m3"].sum()) * df["Volume_m3"] * duration_months
-df["UK_Landed"] = ((df["Export_Cost_ZAR"] + df["Imported_Cost_ZAR"]) / exchange_rate + cost_load).round(3)
-df["RRP_exVAT"] = df["UK_Landed"] * (1 + df["Commission_%"]) * (1 + df["Markup_%"] / 100)
-df["RRP_incVAT"] = df["RRP_exVAT"] * (1 + vat_rate)
+# Recalc function
+def recalculate_uk():
+    df = st.session_state.uk_sku_df.copy()
+    df["Volume_m3"] = (df["Length_mm"] * df["Width_mm"] * df["Depth_mm"]) / 1_000_000_000
+    cost_load = (total_monthly_costs / df["Volume_m3"].sum()) * df["Volume_m3"] * duration_months
+    df["UK_Landed"] = ((df["Export_Cost_ZAR"] + df["Imported_Cost_ZAR"]) / exchange_rate + cost_load).round(3)
+    df["RRP_exVAT"] = df["UK_Landed"] * (1 + df["Commission_%"]) * (1 + df["Markup_%"] / 100)
+    df["RRP_incVAT"] = df["RRP_exVAT"] * (1 + vat_rate)
+    return df
 
-# Buttons
-col1, col2, col3 = st.columns(3)
+# Display Buttons
+col1, col2 = st.columns(2)
 with col1:
-    if st.button("💾 Save to CSV"):
-        st.session_state.uk_sku_df.to_csv(file_path, index=False)
-        st.success("Saved to uk_sku_data.csv")
+    if st.button("💾 Save Changes"):
+        st.session_state.uk_sku_df[base_columns] = st.session_state.uk_edited_df[base_columns]
+        st.success("Changes saved to session memory!")
+
 with col2:
-    if st.button("↩️ Undo"):
-        if st.session_state.uk_history:
-            st.session_state.uk_sku_df = st.session_state.uk_history.pop()
-            st.experimental_rerun()
-        else:
-            st.warning("No undo history.")
-with col3:
     if st.button("🔁 Recalculate"):
         st.session_state.uk_history.append(st.session_state.uk_sku_df.copy())
+        st.session_state.uk_edited_df = recalculate_uk()
         st.experimental_rerun()
 
-# Main Editable Table
+# Show Table
+st.subheader("📊 UK SKU Pricing")
+if "uk_edited_df" not in st.session_state:
+    st.session_state.uk_edited_df = recalculate_uk()
+
 edited_df = st.data_editor(
-    df,
+    st.session_state.uk_edited_df,
     use_container_width=True,
     num_rows="dynamic",
     hide_index=True,
     disabled=["Volume_m3", "UK_Landed", "RRP_exVAT", "RRP_incVAT"]
 )
 
-# Sync data
-st.session_state.uk_sku_df[base_columns] = edited_df[base_columns]
+# Update preview live while editing
+st.session_state.uk_edited_df = edited_df
