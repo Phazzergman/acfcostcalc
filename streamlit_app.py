@@ -15,9 +15,7 @@ default_data = pd.DataFrame([
     "Commission_%", "Markup_%"
 ])
 
-if "uk_sku_df" not in st.session_state:
-    st.session_state.uk_sku_df = default_data.copy()
-elif st.session_state.uk_sku_df.empty:
+if "uk_sku_df" not in st.session_state or st.session_state.uk_sku_df.empty:
     st.session_state.uk_sku_df = default_data.copy()
 
 if "uk_history" not in st.session_state:
@@ -41,17 +39,17 @@ st.sidebar.number_input("Courier", key="uk_cour", value=7000.0)
 uk_rate = st.session_state.uk_rate
 uk_vat = st.session_state.uk_vat / 100
 uk_months = st.session_state.uk_months
-
-uk_ads = st.session_state.uk_ads
-uk_bank = st.session_state.uk_bank
-uk_ops = st.session_state.uk_ops
-uk_ware = st.session_state.uk_ware
-uk_pack = st.session_state.uk_pack
-uk_cour = st.session_state.uk_cour
+monthly_total = sum([
+    st.session_state.uk_ads,
+    st.session_state.uk_bank,
+    st.session_state.uk_ops,
+    st.session_state.uk_ware,
+    st.session_state.uk_pack,
+    st.session_state.uk_cour
+])
 
 # ---------- Recalculation Function ----------
-def recalc_uk():
-    df = st.session_state.uk_sku_df.copy()
+def recalc_uk(df):
     df["Volume_m3"] = (df["Length_mm"] * df["Width_mm"] * df["Depth_mm"]) / 1_000_000_000
     total_volume = df["Volume_m3"].sum()
 
@@ -59,7 +57,6 @@ def recalc_uk():
         st.error("Total volume is zero or invalid. Please check dimensions.")
         return df
 
-    monthly_total = uk_ads + uk_bank + uk_ops + uk_ware + uk_pack + uk_cour
     monthly_per_m3 = (monthly_total / total_volume) * uk_months
 
     df["UK_Landed"] = (df["Imported_Cost_ZAR"] / uk_rate) + (df["Volume_m3"] * monthly_per_m3)
@@ -71,13 +68,32 @@ def recalc_uk():
 
     return df.round(4)
 
+# ---------- Editor FIRST ----------
+st.subheader("📊 UK SKU Pricing")
+non_editable = ["Volume_m3", "UK_Landed", "RRP_exVAT", "RRP_incVAT"]
+for col in non_editable:
+    if col not in st.session_state.uk_sku_df.columns:
+        st.session_state.uk_sku_df[col] = 0.0
+
+edited = st.data_editor(
+    st.session_state.uk_sku_df,
+    use_container_width=True,
+    num_rows="dynamic",
+    disabled=non_editable,
+    hide_index=True
+)
+
+# Update live edited data to session
+if not edited.empty:
+    st.session_state.uk_sku_df.update(edited)
+
 # ---------- Buttons ----------
 col1, col2, col3 = st.columns(3)
 
 with col1:
     if st.button("🔁 Recalculate"):
         st.session_state.uk_history.append(st.session_state.uk_sku_df.copy())
-        st.session_state.uk_sku_df = recalc_uk()
+        st.session_state.uk_sku_df = recalc_uk(st.session_state.uk_sku_df)
         st.success("Recalculated based on latest inputs.")
 
 with col2:
@@ -88,24 +104,3 @@ with col3:
     if st.button("↩️ Undo") and st.session_state.uk_history:
         st.session_state.uk_sku_df = st.session_state.uk_history.pop()
         st.success("Undone to previous state!")
-
-# ---------- Editor ----------
-st.subheader("📊 UK SKU Pricing")
-non_editable = ["Volume_m3", "UK_Landed", "RRP_exVAT", "RRP_incVAT"]
-for col in non_editable:
-    if col not in st.session_state.uk_sku_df.columns:
-        st.session_state.uk_sku_df[col] = 0.0
-
-# Debug
-st.write("✅ DEBUG: SKU Table", st.session_state.uk_sku_df)
-
-edited = st.data_editor(
-    st.session_state.uk_sku_df,
-    use_container_width=True,
-    num_rows="dynamic",
-    disabled=non_editable,
-    hide_index=True
-)
-
-if not edited.empty:
-    st.session_state.uk_sku_df.update(edited)
