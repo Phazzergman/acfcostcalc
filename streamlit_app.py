@@ -97,7 +97,7 @@ def recalculate():
             df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
     st.session_state.sku_df = df
 
-# Recalc always after settings (to handle toggle changes)
+# Recalc always after settings
 recalculate()
 
 # Handle buttons
@@ -137,26 +137,20 @@ edited_df = st.data_editor(
 # Persist edits
 st.session_state.sku_df[base_columns] = edited_df[base_columns]
 
-# CSS for color coding
+# Updated CSS for color coding (broader selector for headers)
 st.markdown("""
 <style>
-div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p {
+div[data-testid="stDataFrameResizable"] th {
   font-weight: bold;
 }
-div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="UK Landed"], 
-div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="UK RRP exVAT"], 
-div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="UK RRP incVAT"] {
-  color: blue;
+div[data-testid="stDataFrameResizable"] th:contains("UK") {
+  color: blue !important;
 }
-div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="USA Landed"], 
-div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="USA RRP exVAT"], 
-div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="USA RRP incVAT"] {
-  color: red;
+div[data-testid="stDataFrameResizable"] th:contains("USA") {
+  color: red !important;
 }
-div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="Germany Landed"], 
-div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="Germany RRP exVAT"], 
-div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="Germany RRP incVAT"] {
-  color: green;
+div[data-testid="stDataFrameResizable"] th:contains("Germany") {
+  color: green !important;
 }
 </style>
 """, unsafe_allow_html=True)
