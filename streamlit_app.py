@@ -54,54 +54,60 @@ sku_data = [
     ["Alpha", "ASC2430", 610, 762, 20, 99.56, 128.04, 33],
 ]
 
-# Use session state to persist the DF across edits
+# Use session state for the DF
 if "sku_df" not in st.session_state:
-    df = pd.DataFrame(sku_data, columns=sku_columns)
-    df["Volume_m³"] = (df["Length_mm"] * df["Width_mm"] * df["Depth_mm"]) / 1_000_000_000
-    st.session_state.sku_df = df  # Initial calc without country, country added below
+    st.session_state.sku_df = pd.DataFrame(sku_data, columns=sku_columns)
 
-# Recalculate button
-if st.sidebar.button("Recalculate Volume and Costs"):
-    # Update volume based on current L/W/D
-    st.session_state.sku_df["Volume_m³"] = (st.session_state.sku_df["Length_mm"] * st.session_state.sku_df["Width_mm"] * st.session_state.sku_df["Depth_mm"]) / 1_000_000_000
-    
-    # Recalculate country pricing
-    for country in countries:
-        if country_toggle[country]:
-            rate = country_settings[country]["rate"]
-            vat = country_settings[country]["vat"]
-            monthly = country_settings[country]["monthly_costs"]
-            vol_total = country_settings[country]["container_volume"]
-            cont_cost = country_settings[country]["container_cost"]
+# Get edited DF from data_editor (this triggers on edits)
+edited_df = st.data_editor(
+    st.session_state.sku_df,
+    use_container_width=True,
+    num_rows="dynamic",
+    disabled=["Volume_m³"] + [f"{c} Landed" for c in countries if country_toggle[c]] + 
+    [f"{c} RRP exVAT" for c in countries if country_toggle[c]] + 
+    [f"{c} RRP incVAT" for c in countries if country_toggle[c]]
+)
 
-            cost_load = (monthly / vol_total) * st.session_state.sku_df["Volume_m³"] * duration_months
+# Auto-update session state with edits and recalculate
+st.session_state.sku_df = edited_df.copy()  # Persist edits
 
-            shipping_ZAR = cont_cost * st.session_state.sku_df["Volume_m³"] / vol_total
+# Calculate Volume (auto on every run)
+st.session_state.sku_df["Volume_m³"] = (st.session_state.sku_df["Length_mm"] * 
+                                        st.session_state.sku_df["Width_mm"] * 
+                                        st.session_state.sku_df["Depth_mm"]) / 1_000_000_000
 
-            total_ZAR = st.session_state.sku_df["Factory_Cost_ZAR"] + st.session_state.sku_df["Export_Cost_ZAR"] + shipping_ZAR
-
-            landed = (total_ZAR / rate) + cost_load
-
-            commission_factor = 1 + (st.session_state.sku_df["Commission_%"] / 100)
-            rrp_exvat = landed * commission_factor
-            rrp_incvat = rrp_exvat * (1 + vat)
-
-            st.session_state.sku_df[f"{country} Landed"] = landed.round(2)
-            st.session_state.sku_df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
-            st.session_state.sku_df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
-
-# Lock calculated columns
-locked_cols = ["Volume_m³"]
+# Auto-recalculate pricing
 for country in countries:
     if country_toggle[country]:
-        locked_cols += [
-            f"{country} Landed", f"{country} RRP exVAT", f"{country} RRP incVAT"
-        ]
+        rate = country_settings[country]["rate"]
+        vat = country_settings[country]["vat"]
+        monthly = country_settings[country]["monthly_costs"]
+        vol_total = country_settings[country]["container_volume"]
+        cont_cost = country_settings[country]["container_cost"]
 
-# Display the editor
+        cost_load = (monthly / vol_total) * st.session_state.sku_df["Volume_m³"] * duration_months
+
+        shipping_ZAR = cont_cost * st.session_state.sku_df["Volume_m³"] / vol_total
+
+        total_ZAR = st.session_state.sku_df["Factory_Cost_ZAR"] + st.session_state.sku_df["Export_Cost_ZAR"] + shipping_ZAR
+
+        landed = (total_ZAR / rate) + cost_load
+
+        commission_factor = 1 + (st.session_state.sku_df["Commission_%"] / 100)
+        rrp_exvat = landed * commission_factor
+        rrp_incvat = rrp_exvat * (1 + vat)
+
+        st.session_state.sku_df[f"{country} Landed"] = landed.round(2)
+        st.session_state.sku_df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
+        st.session_state.sku_df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
+
+# Re-display the updated DF (to show calcs immediately)
 st.data_editor(
     st.session_state.sku_df,
     use_container_width=True,
     num_rows="dynamic",
-    disabled=locked_cols
+    disabled=["Volume_m³"] + [f"{c} Landed" for c in countries if country_toggle[c]] + 
+    [f"{c} RRP exVAT" for c in countries if country_toggle[c]] + 
+    [f"{c} RRP incVAT" for c in countries if country_toggle[c]],
+    hide_index=True  # Optional: Cleaner look
 )
