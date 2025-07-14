@@ -5,7 +5,7 @@ import pandas as pd
 st.set_page_config(page_title="📦 ACF SKU Pricing Intelligence Dashboard", layout="wide")
 st.title("📦 ACF SKU Pricing Intelligence Dashboard")
 
-# Buttons in main page, above table
+# Buttons in main page
 col1, col2, col3 = st.columns(3)
 with col1:
     recalc_button = st.button("Recalculate")
@@ -20,8 +20,7 @@ countries = ["UK", "USA", "Germany"]
 country_toggle = {c: st.sidebar.checkbox(c, value=(c == "UK")) for c in countries}
 
 # Sell-through duration
-st.sidebar.number_input("Sell-Through Duration (Months)", min_value=1, max_value=24, value=6, key="duration_months")
-duration_months = st.session_state.duration_months
+duration_months = st.sidebar.number_input("Sell-Through Duration (Months)", min_value=1, max_value=24, value=6)
 
 # Country-specific settings
 country_settings = {}
@@ -118,16 +117,47 @@ if undo_button and st.session_state.history:
     recalculate()
     st.success("Undone to previous state!")
 
-# Display the editor
+# Selected countries
+selected_countries = [c for c in countries if country_toggle[c]]
+
+# Displayed columns (base + volume + selected country columns)
+displayed_columns = base_columns + ["Volume_m³"] + sum([[f"{c} Landed", f"{c} RRP exVAT", f"{c} RRP incVAT"] for c in selected_countries if f"{c} Landed" in st.session_state.sku_df.columns], [])
+
+# Displayed DF
+displayed_df = st.session_state.sku_df[displayed_columns].copy()
+
+# Editor on displayed DF
 edited_df = st.data_editor(
-    st.session_state.sku_df,
+    displayed_df,
     use_container_width=True,
     num_rows="dynamic",
-    disabled=["Volume_m³"] + [f"{c} Landed" for c in countries if country_toggle[c]] + 
-              [f"{c} RRP exVAT" for c in countries if country_toggle[c]] + 
-              [f"{c} RRP incVAT" for c in countries if country_toggle[c]],
+    disabled=["Volume_m³"] + sum([[f"{c} Landed", f"{c} RRP exVAT", f"{c} RRP incVAT"] for c in selected_countries], []),
     hide_index=True
 )
 
-# Persist edits to base columns
+# Persist edits to full DF (only base columns)
 st.session_state.sku_df[base_columns] = edited_df[base_columns]
+
+# Optional CSS for color-coding headers (UK blue, USA red, Germany green)
+st.markdown("""
+<style>
+div[data-testid="column"] > div > div > div > div > div > label {
+  font-weight: bold;
+}
+div[data-testid="column"] > div > div > div > div > div > label[title="UK Landed"], 
+div[data-testid="column"] > div > div > div > div > div > label[title="UK RRP exVAT"], 
+div[data-testid="column"] > div > div > div > div > div > label[title="UK RRP incVAT"] {
+  color: blue;
+}
+div[data-testid="column"] > div > div > div > div > div > label[title="USA Landed"], 
+div[data-testid="column"] > div > div > div > div > div > label[title="USA RRP exVAT"], 
+div[data-testid="column"] > div > div > div > div > div > label[title="USA RRP incVAT"] {
+  color: red;
+}
+div[data-testid="column"] > div > div > div > div > div > label[title="Germany Landed"], 
+div[data-testid="column"] > div > div > div > div > div > label[title="Germany RRP exVAT"], 
+div[data-testid="column"] > div > div > div > div > div > label[title="Germany RRP incVAT"] {
+  color: green;
+}
+</style>
+""", unsafe_allow_html=True)
