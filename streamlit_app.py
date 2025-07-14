@@ -1,51 +1,71 @@
 import streamlit as st
+import pandas as pd
+
+st.set_page_config(page_title="ACF UK Pricing Estimator", layout="wide")
 
 st.title("ACF UK Pricing & Profitability Estimator")
 
-st.header("1. Base Costs")
-factory_cost = st.number_input("Factory cost per unit (in £):", value=4.17)
-shipping_cost = st.number_input("Shipping cost per unit (in £):", value=0.00)
-landed_cost = factory_cost + shipping_cost
-st.write(f"**Landed Cost (per unit):** £{landed_cost:.2f}")
+# Sidebar Inputs
+st.sidebar.header("Global Inputs")
 
-st.header("2. Commission")
-commission_percent = st.slider("Commission % (UK-based entity)", 0, 100, 20)
-commission_value = landed_cost * (commission_percent / 100)
-post_commission_cost = landed_cost + commission_value
-st.write(f"**Cost after Commission:** £{post_commission_cost:.2f}")
+exchange_rate = st.sidebar.number_input("Exchange Rate (ZAR to GBP)", value=1.20)
+commission_percent = st.sidebar.number_input("Commission % (UK entity)", value=20.0)
+markup_percent = st.sidebar.number_input("Markup %", value=50.0)
+vat_percent = st.sidebar.number_input("VAT %", value=20.0)
 
-st.header("3. Markup & Retail")
-markup_percent = st.slider("Markup %", 0, 300, 50)
-pre_vat_price = post_commission_cost * (1 + markup_percent / 100)
-st.write(f"**Price Before VAT:** £{pre_vat_price:.2f}")
+monthly_warehouse_cost = st.sidebar.number_input("Monthly Warehousing (£)", value=0.0)
+monthly_handling_cost = st.sidebar.number_input("Monthly Handling (£)", value=0.0)
+monthly_ad_cost = st.sidebar.number_input("Monthly Advertising (£)", value=0.0)
+estimated_units_sold = st.sidebar.number_input("Estimated Units Sold per Month", value=1000)
 
-vat_percent = st.slider("VAT %", 0, 30, 20)
-vat_value = pre_vat_price * (vat_percent / 100)
-final_price = pre_vat_price + vat_value
-st.write(f"**Final Price (incl. VAT):** £{final_price:.2f}")
+# Simulated SKU input table (replace with your own table logic)
+st.subheader("Container SKUs and Costs")
 
-st.header("4. Optional Monthly Costs")
-st.caption("These will be divided by units sold and added to monthly per-unit cost.")
-monthly_warehouse_cost = st.number_input("Monthly Warehousing (£):", value=0.0)
-monthly_handling_cost = st.number_input("Monthly Postage/Handling (£):", value=0.0)
-monthly_ad_cost = st.number_input("Monthly Advertising Spend (£):", value=0.0)
-units_sold_monthly = st.number_input("Estimated Monthly Units Sold:", value=1000)
+data = {
+    "SKU": ["ABC123", "DEF456", "GHI789"],
+    "Volume %": [0.25, 0.35, 0.40],
+    "Factory Cost (£)": [3.50, 4.00, 4.50],
+    "Shipping (£)": [0.67, 0.85, 1.00]
+}
 
-if units_sold_monthly > 0:
-    warehouse_per_unit = monthly_warehouse_cost / units_sold_monthly
-    handling_per_unit = monthly_handling_cost / units_sold_monthly
-    ad_per_unit = monthly_ad_cost / units_sold_monthly
-    total_monthly_addon = warehouse_per_unit + handling_per_unit + ad_per_unit
+df = pd.DataFrame(data)
+df["Landed Cost (£)"] = df["Factory Cost (£)"] + df["Shipping (£)"]
+df["Commission (£)"] = df["Landed Cost (£)"] * (commission_percent / 100)
+df["Post-Commission (£)"] = df["Landed Cost (£)"] + df["Commission (£)"]
+df["Pre-VAT Price (£)"] = df["Post-Commission (£)"] * (1 + markup_percent / 100)
+df["VAT (£)"] = df["Pre-VAT Price (£)"] * (vat_percent / 100)
+df["RRP incl VAT (£)"] = df["Pre-VAT Price (£)"] + df["VAT (£)"]
 
-    st.write(f"**Add-on per unit from monthly ops:** £{total_monthly_addon:.2f}")
-    adjusted_profit = final_price - post_commission_cost - total_monthly_addon
-    st.success(f"**Estimated Profit per Unit:** £{adjusted_profit:.2f}")
+# Optional operational add-ons per unit
+if estimated_units_sold > 0:
+    op_costs_per_unit = (
+        monthly_warehouse_cost + monthly_handling_cost + monthly_ad_cost
+    ) / estimated_units_sold
 else:
-    st.warning("Please input estimated units sold to calculate operational cost impact.")
+    op_costs_per_unit = 0.0
 
-st.header("5. Exchange Rate (if needed)")
-use_forex = st.checkbox("Apply exchange rate?")
-if use_forex:
-    forex_rate = st.number_input("Exchange Rate (e.g. 1.20 for ZAR → GBP):", value=1.0)
-    local_price = final_price * forex_rate
-    st.write(f"**Local Price Equivalent:** {local_price:.2f} (based on rate)")
+df["Total Cost + Ops (£)"] = df["Post-Commission (£)"] + op_costs_per_unit
+df["Profit per Unit (£)"] = df["RRP incl VAT (£)"] - df["Total Cost + Ops (£)"]
+
+# Display table
+st.markdown("### 📦 SKU Pricing Table")
+st.dataframe(df.style.format({
+    "Factory Cost (£)": "£{:.2f}",
+    "Shipping (£)": "£{:.2f}",
+    "Landed Cost (£)": "£{:.2f}",
+    "Commission (£)": "£{:.2f}",
+    "Post-Commission (£)": "£{:.2f}",
+    "Pre-VAT Price (£)": "£{:.2f}",
+    "VAT (£)": "£{:.2f}",
+    "RRP incl VAT (£)": "£{:.2f}",
+    "Total Cost + Ops (£)": "£{:.2f}",
+    "Profit per Unit (£)": "£{:.2f}",
+}), use_container_width=True)
+
+# Summary
+st.markdown("### 🧾 Summary")
+total_profit = df["Profit per Unit (£)"].sum()
+avg_profit = df["Profit per Unit (£)"].mean()
+st.success(f"Average Profit per SKU: £{avg_profit:.2f}")
+st.info(f"Total Combined Profit: £{total_profit:.2f}")
+
