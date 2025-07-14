@@ -45,7 +45,10 @@ def recalc_uk():
     df["UK_Landed"] = (df["Imported_Cost_ZAR"] / uk_rate) + (df["Volume_m3"] * monthly_per_m3)
     df["RRP_exVAT"] = df["UK_Landed"] * (1 + df["Commission_%"] / 100 + df["Markup_%"] / 100)
     df["RRP_incVAT"] = df["RRP_exVAT"] * (1 + uk_vat)
-    return df.round(4)
+    df["RRP_exVAT"] = df["RRP_exVAT"].round(2)
+df["RRP_incVAT"] = df["RRP_incVAT"].round(2)
+return df.round(4)
+
 
 # ---------- Buttons ----------
 col1, col2, col3 = st.columns(3)
