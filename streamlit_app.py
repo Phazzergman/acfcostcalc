@@ -3,7 +3,6 @@ import pandas as pd
 import copy
 
 st.set_page_config(layout="wide")
-
 st.title("GB UK SKU Pricing Intelligence Dashboard")
 
 # --- SIDEBAR SETTINGS ---
@@ -31,8 +30,8 @@ initial_data = pd.DataFrame([
         "Depth_mm": 20,
         "Export_Cost_ZAR": 100.00,
         "Imported_Cost_ZAR": 120.00,
-        "Commission_%": 0.10,
-        "Markup_%": 1.00,
+        "Commission_%": 10.0,
+        "Markup_%": 100.0,
         "Volume_m3": 0.0022,
     },
     {
@@ -42,8 +41,8 @@ initial_data = pd.DataFrame([
         "Depth_mm": 20,
         "Export_Cost_ZAR": 42.99,
         "Imported_Cost_ZAR": 0.00,
-        "Commission_%": 0.20,
-        "Markup_%": 10.00,
+        "Commission_%": 20.0,
+        "Markup_%": 50.0,
         "Volume_m3": 0.0025,
     }
 ])
@@ -65,20 +64,16 @@ if col3.button("Undo"):
 if col1.button("Recalculate"):
     df = st.session_state["data"]
 
-    # Correct exchange logic: GBP = ZAR * (1 / exchange_rate)
+    # Convert ZAR to GBP using 1 / exchange rate
     gbp_per_zar = 1 / exchange_rate
     df["UK_Landed"] = df["Export_Cost_ZAR"] * gbp_per_zar
 
-    # Commission (in GBP)
-    df["Commission_GBP"] = df["UK_Landed"] * df["Commission_%"]
-
-    # Retail ex VAT
-    df["RRP_exVAT"] = (df["UK_Landed"] + df["Commission_GBP"]) * (1 + df["Markup_%"])
-
-    # Retail incl VAT
+    # Convert % fields properly (e.g. 10 = 10%)
+    df["Commission_GBP"] = df["UK_Landed"] * (df["Commission_%"] / 100)
+    df["RRP_exVAT"] = (df["UK_Landed"] + df["Commission_GBP"]) * (1 + df["Markup_%"] / 100)
     df["RRP_incVAT"] = df["RRP_exVAT"] * (1 + vat_pct)
 
-    # Optional: Round values for display
+    # Round for neatness
     df[["UK_Landed", "Commission_GBP", "RRP_exVAT", "RRP_incVAT"]] = df[
         ["UK_Landed", "Commission_GBP", "RRP_exVAT", "RRP_incVAT"]
     ].round(4)
@@ -86,7 +81,7 @@ if col1.button("Recalculate"):
     st.session_state["data"] = df
     st.success("Recalculated based on latest inputs.")
 
-# --- DISPLAY TABLE ---
+# --- DISPLAY EDITABLE TABLE ---
 st.subheader("📊 UK SKU Pricing")
 edited_df = st.data_editor(
     st.session_state["data"],
