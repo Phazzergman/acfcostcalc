@@ -34,7 +34,7 @@ st.sidebar.number_input("Warehousing", key="uk_ware", value=10000.0)
 st.sidebar.number_input("Packing", key="uk_pack", value=6000.0)
 st.sidebar.number_input("Courier", key="uk_cour", value=7000.0)
 
-# 👉 Now extract usable values like this:
+# 👉 Extract usable values from session_state
 uk_rate = st.session_state.uk_rate
 uk_vat = st.session_state.uk_vat / 100
 uk_months = st.session_state.uk_months
@@ -46,21 +46,31 @@ uk_ware = st.session_state.uk_ware
 uk_pack = st.session_state.uk_pack
 uk_cour = st.session_state.uk_cour
 
-
 # ---------- Recalculation Function ----------
 def recalc_uk():
     df = st.session_state.uk_sku_df.copy()
+
+    # Recalculate volume
     df["Volume_m3"] = (df["Length_mm"] * df["Width_mm"] * df["Depth_mm"]) / 1_000_000_000
     total_volume = df["Volume_m3"].sum()
+
+    if total_volume == 0 or pd.isna(total_volume):
+        st.error("Total volume is zero or invalid. Please check dimensions.")
+        return df
+
+    # Monthly overheads
+    monthly_total = uk_ads + uk_bank + uk_ops + uk_ware + uk_pack + uk_cour
     monthly_per_m3 = (monthly_total / total_volume) * uk_months
 
+    # Landed + RRP calcs
     df["UK_Landed"] = (df["Imported_Cost_ZAR"] / uk_rate) + (df["Volume_m3"] * monthly_per_m3)
     df["RRP_exVAT"] = df["UK_Landed"] * (1 + df["Commission_%"] / 100 + df["Markup_%"] / 100)
     df["RRP_incVAT"] = df["RRP_exVAT"] * (1 + uk_vat)
+
     df["RRP_exVAT"] = df["RRP_exVAT"].round(2)
     df["RRP_incVAT"] = df["RRP_incVAT"].round(2)
-    return df.round(4)
 
+    return df.round(4)
 
 # ---------- Buttons ----------
 col1, col2, col3 = st.columns(3)
@@ -80,19 +90,4 @@ with col3:
         st.session_state.uk_sku_df = st.session_state.uk_history.pop()
         st.success("Undone to previous state!")
 
-# ---------- Editor ----------
-st.subheader("📊 UK SKU Pricing")
-non_editable = ["Volume_m3", "UK_Landed", "RRP_exVAT", "RRP_incVAT"]
-for col in non_editable:
-    if col not in st.session_state.uk_sku_df.columns:
-        st.session_state.uk_sku_df[col] = 0.0
-
-edited = st.data_editor(
-    st.session_state.uk_sku_df,
-    use_container_width=True,
-    num_rows="dynamic",
-    disabled=non_editable,
-    hide_index=True
-)
-
-st.session_state.uk_sku_df.update(edited)
+# --------
