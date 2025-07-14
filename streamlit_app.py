@@ -2,79 +2,135 @@ import streamlit as st
 import pandas as pd
 
 # Page setup
-st.set_page_config(page_title="🇬🇧 UK SKU Pricing View", layout="wide")
-st.title("🇬🇧 UK SKU Pricing Intelligence Dashboard")
+st.set_page_config(page_title="📦 ACF SKU Pricing Intelligence Dashboard", layout="wide")
+st.title("📦 ACF SKU Pricing Intelligence Dashboard")
 
-# ---- Editable base data for UK ----
-columns = [
-    "SKU", "Length_mm", "Width_mm", "Depth_mm",
-    "Export_Cost_ZAR", "Imported_Cost_ZAR", "Commission_%", "Markup_%"
-]
+# Buttons in main page
+col1, col2, col3 = st.columns(3)
+with col1:
+    recalc_button = st.button("Recalculate")
+with col2:
+    save_button = st.button("Save Changes")
+with col3:
+    undo_button = st.button("Undo")
 
-# Session-persisted DataFrame
-if "uk_sku_df" not in st.session_state:
-    st.session_state.uk_sku_df = pd.DataFrame([
-        ["ASC1014", 289, 389, 20, 35.22, 0.18, 0.10, 10.0],
-        ["ASC1216", 305, 406, 20, 42.99, 0.20, 1.99, 10.0],
-    ], columns=columns)
+# Sidebar country toggle
+st.sidebar.header("Toggle Countries")
+countries = ["UK", "USA", "Germany"]
+country_toggle = {c: st.sidebar.checkbox(c, value=(c == "UK")) for c in countries}
 
-# Sidebar inputs
-st.sidebar.header("UK Settings")
-exchange_rate = st.sidebar.number_input("Exchange Rate (ZAR → GBP)", value=19.0)
-vat_percent = st.sidebar.number_input("VAT %", value=0.20)
+# Sell-through duration
 duration_months = st.sidebar.number_input("Sell-Through Duration (Months)", min_value=1, max_value=24, value=6)
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("Monthly Costs")
-ads = st.sidebar.number_input("Advertising", value=3000.0)
-bank = st.sidebar.number_input("Banking", value=2000.0)
-ops = st.sidebar.number_input("Ops Cost", value=4000.0)
-ware = st.sidebar.number_input("Warehousing", value=10000.0)
-pack = st.sidebar.number_input("Packing", value=6000.0)
-cour = st.sidebar.number_input("Courier", value=7000.0)
+# Country-specific settings
+country_settings = {}
+for country in countries:
+    if country_toggle[country]:
+        with st.sidebar.expander(f"{country} Settings", expanded=True):
+            rate = st.number_input(f"{country} Exchange Rate (ZAR → Local)", value=19.0, key=f"rate_{country}")
+            vat = st.number_input(f"{country} VAT %", value=0.20, key=f"vat_{country}")
+            ads = st.number_input(f"{country} Advertising (Monthly)", value=3000.0, key=f"ads_{country}")
+            bank = st.number_input(f"{country} Banking (Monthly)", value=2000.0, key=f"bank_{country}")
+            ops = st.number_input(f"{country} Ops Cost (Monthly)", value=4000.0, key=f"ops_{country}")
+            ware = st.number_input(f"{country} Warehousing (Monthly)", value=10000.0, key=f"ware_{country}")
+            pack = st.number_input(f"{country} Packing (Monthly)", value=6000.0, key=f"pack_{country}")
+            cour = st.number_input(f"{country} Courier (Monthly)", value=7000.0, key=f"cour_{country}")
 
-# Total monthly cost
-total_monthly_cost = ads + bank + ops + ware + pack + cour
+        country_settings[country] = {
+            "rate": rate,
+            "vat": vat,
+            "monthly_costs": ads + bank + ops + ware + pack + cour
+        }
 
-# Editable SKU table
-editable_df = st.data_editor(
-    st.session_state.uk_sku_df,
+# Base columns
+base_columns = [
+    "SKU", "Length_mm", "Width_mm", "Depth_mm",
+    "Export_Cost_ZAR", "Imported_Cost_ZAR", "Commission_%", "MU_%"
+]
+
+# File for persistence
+file_path = "sku_data.csv"
+
+# Load from file or initial
+if "sku_df" not in st.session_state:
+    try:
+        st.session_state.sku_df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        st.session_state.sku_df = pd.DataFrame([
+            ["ASC1014", 289, 389, 20, 35.22, 0.18, 10, 0],
+            ["ASC1216", 305, 406, 20, 42.99, 0.20, 10, 0],
+            # Add other SKUs with 0 for Imported, Commission, MU
+            ["ASC608", 152, 203, 20, 16.79, 0.0, 10, 0],
+            ["ASC1012", 255, 305, 20, 31.86, 0.0, 10, 0],
+            ["ASC1418", 355, 457, 20, 53.51, 0.0, 10, 0],
+            ["ASC1620", 406, 501, 20, 62.34, 0.0, 10, 0],
+            ["ASC1824", 457, 610, 20, 73.20, 0.0, 10, 0],
+            ["ASC2024", 501, 610, 20, 78.14, 0.0, 10, 0],
+            ["ASC2430", 610, 762, 20, 99.56, 0.0, 10, 0],
+        ], columns=base_columns)
+    st.session_state.history = []  # For undo
+
+# Define recalc function
+def recalculate():
+    df = st.session_state.sku_df.copy()
+    df["Volume_m³"] = (df["Length_mm"] * df["Width_mm"] * df["Depth_mm"]) / 1_000_000_000
+    for country in countries:
+        if country_toggle[country] and country in country_settings:
+            rate = country_settings[country]["rate"]
+            vat = country_settings[country]["vat"]
+            total_monthly_cost = country_settings[country]["monthly_costs"]
+
+            total_imported_cost_sum = df["Imported_Cost_ZAR"].sum()
+            value_share = df["Imported_Cost_ZAR"] / total_imported_cost_sum if total_imported_cost_sum != 0 else 0
+            sku_monthly_cost = value_share * total_monthly_cost * duration_months
+
+            total_ZAR = df["Export_Cost_ZAR"] + df["Imported_Cost_ZAR"]
+            landed = (total_ZAR / rate) + sku_monthly_cost + (df["Commission_%"] / 100 * (total_ZAR / rate))  # Added commission on converted base
+
+            rrp_exvat = landed * (1 + df["MU_%"] / 100)
+            rrp_incvat = rrp_exvat * (1 + vat)
+
+            df[f"{country} Landed"] = landed.round(2)
+            df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
+            df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
+    st.session_state.sku_df = df
+
+# Recalc always after settings
+recalculate()
+
+# Handle buttons
+if recalc_button:
+    st.session_state.history.append(st.session_state.sku_df[base_columns].copy())
+    if len(st.session_state.history) > 5:
+        st.session_state.history.pop(0)
+    recalculate()
+
+if save_button:
+    st.session_state.sku_df[base_columns].to_csv(file_path, index=False)
+    st.success("Changes saved to sku_data.csv!")
+
+if undo_button and st.session_state.history:
+    st.session_state.sku_df[base_columns] = st.session_state.history.pop()
+    recalculate()
+    st.success("Undone to previous state!")
+
+# Selected countries
+selected_countries = [c for c in countries if country_toggle[c]]
+
+# Displayed columns (removed Category)
+displayed_columns = base_columns + ["Volume_m³"] + sum([[f"{c} Landed", f"{c} RRP exVAT", f"{c} RRP incVAT"] for c in selected_countries if f"{c} Landed" in st.session_state.sku_df.columns], [])
+
+# Displayed DF
+displayed_df = st.session_state.sku_df[displayed_columns].copy()
+
+# Editor
+edited_df = st.data_editor(
+    displayed_df,
     use_container_width=True,
     num_rows="dynamic",
+    disabled=["Volume_m³"] + sum([[f"{c} Landed", f"{c} RRP exVAT", f"{c} RRP incVAT"] for c in selected_countries], []),
     hide_index=True
 )
 
-# Calculate volume
-editable_df["Volume_m3"] = (
-    editable_df["Length_mm"] * editable_df["Width_mm"] * editable_df["Depth_mm"] / 1_000_000_000
-)
-
-# Monthly cost allocation by volume share
-total_volume = editable_df["Volume_m3"].sum()
-editable_df["Allocated_Monthly_Cost"] = (
-    editable_df["Volume_m3"] / total_volume * total_monthly_cost * duration_months
-)
-
-# UK Landed (imported cost + commission + allocated cost)
-editable_df["UK_Landed"] = (
-    (editable_df["Imported_Cost_ZAR"] / exchange_rate) +
-    editable_df["Commission_%"] +
-    editable_df["Allocated_Monthly_Cost"]
-)
-
-# RRP Calculations
-editable_df["RRP_exVAT"] = editable_df["UK_Landed"] * (1 + editable_df["Markup_%"] / 100)
-editable_df["RRP_incVAT"] = editable_df["RRP_exVAT"] * (1 + vat_percent)
-
-# Display final results
-st.subheader("💷 UK SKU Pricing")
-st.dataframe(
-    editable_df[[
-        "SKU", "Length_mm", "Width_mm", "Depth_mm", "Export_Cost_ZAR", "Imported_Cost_ZAR",
-        "Commission_%", "Markup_%", "Volume_m3", "UK_Landed", "RRP_exVAT", "RRP_incVAT"
-    ]].round(4),
-    use_container_width=True
-)
-
-# Save back to session state
-st.session_state.uk_sku_df = editable_df
+# Persist edits
+st.session_state.sku_df[base_columns] = edited_df[base_columns]
