@@ -39,4 +39,90 @@ for country in countries:
 
 # Base columns
 base_columns = [
-    "Category", "SKU",
+    "Category", "SKU", "Length_mm", "Width_mm", "Depth_mm",
+    "Factory_Cost_ZAR", "Export_Cost_ZAR", "Commission_%"
+]
+
+# File for persistence
+file_path = "sku_data.csv"
+
+# Load from file or initial
+if "sku_df" not in st.session_state:
+    try:
+        st.session_state.sku_df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        st.session_state.sku_df = pd.DataFrame([
+            ["Alpha", "ASC608", 152, 203, 20, 16.79, 21.60, 33],
+            ["Alpha", "ASC1012", 255, 305, 20, 31.86, 40.97, 33],
+            ["Alpha", "ASC1014", 255, 355, 20, 35.22, 45.29, 33],
+            ["Alpha", "ASC1216", 305, 406, 20, 42.99, 55.28, 33],
+            ["Alpha", "ASC1418", 355, 457, 20, 53.51, 68.82, 33],
+            ["Alpha", "ASC1620", 406, 501, 20, 62.34, 80.17, 33],
+            ["Alpha", "ASC1824", 457, 610, 20, 73.20, 94.15, 33],
+            ["Alpha", "ASC2024", 501, 610, 20, 78.14, 100.49, 33],
+            ["Alpha", "ASC2430", 610, 762, 20, 99.56, 128.04, 33],
+        ], columns=base_columns)
+    st.session_state.history = []  # For undo
+
+# Buttons in sidebar for actions
+st.sidebar.header("Actions")
+recalc_button = st.sidebar.button("Recalculate")
+save_button = st.sidebar.button("Save Changes")
+undo_button = st.sidebar.button("Undo")
+
+# Function to recalc
+def recalculate():
+    df = st.session_state.sku_df
+    df["Volume_m³"] = (df["Length_mm"] * df["Width_mm"] * df["Depth_mm"]) / 1_000_000_000
+    for country in countries:
+        if country_toggle[country]:
+            rate = country_settings[country]["rate"]
+            vat = country_settings[country]["vat"]
+            monthly = country_settings[country]["monthly_costs"]
+            vol_total = country_settings[country]["container_volume"]
+            cont_cost = country_settings[country]["container_cost"]
+
+            cost_load = (monthly / vol_total) * df["Volume_m³"] * duration_months
+            shipping_ZAR = cont_cost * df["Volume_m³"] / vol_total
+            total_ZAR = df["Factory_Cost_ZAR"] + df["Export_Cost_ZAR"] + shipping_ZAR
+            landed = (total_ZAR / rate) + cost_load
+            commission_factor = 1 + (df["Commission_%"] / 100)
+            rrp_exvat = landed * commission_factor
+            rrp_incvat = rrp_exvat * (1 + vat)
+            df[f"{country} Landed"] = landed.round(2)
+            df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
+            df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
+    st.session_state.sku_df = df
+
+# Handle buttons
+if recalc_button:
+    # Push to history before recalc
+    st.session_state.history.append(st.session_state.sku_df[base_columns].copy())
+    if len(st.session_state.history) > 5:
+        st.session_state.history.pop(0)
+    recalculate()
+
+if save_button:
+    # Save base to CSV
+    st.session_state.sku_df[base_columns].to_csv(file_path, index=False)
+    st.success("Changes saved to sku_data.csv!")
+
+if undo_button and st.session_state.history:
+    # Revert to last history
+    st.session_state.sku_df[base_columns] = st.session_state.history.pop()
+    recalculate()  # Recalc after undo
+    st.success("Undone to previous state!")
+
+# Display the editor
+edited_df = st.data_editor(
+    st.session_state.sku_df,
+    use_container_width=True,
+    num_rows="dynamic",
+    disabled=["Volume_m³"] + [f"{c} Landed" for c in countries if country_toggle[c]] + 
+              [f"{c} RRP exVAT" for c in countries if country_toggle[c]] + 
+              [f"{c} RRP incVAT" for c in countries if country_toggle[c]],
+    hide_index=True
+)
+
+# Persist edits to base columns (for next rerun without buttons)
+st.session_state.sku_df[base_columns] = edited_df[base_columns]
