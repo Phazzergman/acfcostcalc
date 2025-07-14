@@ -37,7 +37,7 @@ for country in countries:
             "monthly_costs": ads + bank + ops + ware + pack + cour
         }
 
-# Actions buttons always in sidebar
+# Actions buttons
 st.sidebar.header("Actions")
 recalc_button = st.sidebar.button("Recalculate")
 save_button = st.sidebar.button("Save Changes")
@@ -70,11 +70,7 @@ if "sku_df" not in st.session_state:
         ], columns=base_columns)
     st.session_state.history = []  # For undo
 
-# Initial recalc on load if no calculated columns
-if "Volume_m³" not in st.session_state.sku_df.columns:
-    recalculate()
-
-# Function to recalc
+# Define recalc function
 def recalculate():
     df = st.session_state.sku_df.copy()
     df["Volume_m³"] = (df["Length_mm"] * df["Width_mm"] * df["Depth_mm"]) / 1_000_000_000
@@ -97,6 +93,10 @@ def recalculate():
             df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
             df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
     st.session_state.sku_df = df
+
+# Initial recalc on load
+if "Volume_m³" not in st.session_state.sku_df.columns:
+    recalculate()
 
 # Handle buttons
 if recalc_button:
