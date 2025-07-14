@@ -46,30 +46,30 @@ for country in countries:
             "monthly_costs": ads + bank + ops + ware + pack + cour
         }
 
-# Base columns
+# Base columns (removed Category)
 base_columns = [
-    "Category", "SKU", "Length_mm", "Width_mm", "Depth_mm",
+    "SKU", "Length_mm", "Width_mm", "Depth_mm",
     "Factory_Cost_ZAR", "Export_Cost_ZAR", "Commission_%"
 ]
 
 # File for persistence
 file_path = "sku_data.csv"
 
-# Load from file or initial
+# Load from file or initial (removed Category from initial data)
 if "sku_df" not in st.session_state:
     try:
         st.session_state.sku_df = pd.read_csv(file_path)
     except FileNotFoundError:
         st.session_state.sku_df = pd.DataFrame([
-            ["Alpha", "ASC608", 152, 203, 20, 16.79, 21.60, 33],
-            ["Alpha", "ASC1012", 255, 305, 20, 31.86, 40.97, 33],
-            ["Alpha", "ASC1014", 255, 355, 20, 35.22, 45.29, 33],
-            ["Alpha", "ASC1216", 305, 406, 20, 42.99, 55.28, 33],
-            ["Alpha", "ASC1418", 355, 457, 20, 53.51, 68.82, 33],
-            ["Alpha", "ASC1620", 406, 501, 20, 62.34, 80.17, 33],
-            ["Alpha", "ASC1824", 457, 610, 20, 73.20, 94.15, 33],
-            ["Alpha", "ASC2024", 501, 610, 20, 78.14, 100.49, 33],
-            ["Alpha", "ASC2430", 610, 762, 20, 99.56, 128.04, 33],
+            ["ASC608", 152, 203, 20, 16.79, 21.60, 33],
+            ["ASC1012", 255, 305, 20, 31.86, 40.97, 33],
+            ["ASC1014", 255, 355, 20, 35.22, 45.29, 33],
+            ["ASC1216", 305, 406, 20, 42.99, 55.28, 33],
+            ["ASC1418", 355, 457, 20, 53.51, 68.82, 33],
+            ["ASC1620", 406, 501, 20, 62.34, 80.17, 33],
+            ["ASC1824", 457, 610, 20, 73.20, 94.15, 33],
+            ["ASC2024", 501, 610, 20, 78.14, 100.49, 33],
+            ["ASC2430", 610, 762, 20, 99.56, 128.04, 33],
         ], columns=base_columns)
     st.session_state.history = []  # For undo
 
@@ -119,7 +119,7 @@ if undo_button and st.session_state.history:
 # Selected countries
 selected_countries = [c for c in countries if country_toggle[c]]
 
-# Displayed columns
+# Displayed columns (removed Category)
 displayed_columns = base_columns + ["Volume_m³"] + sum([[f"{c} Landed", f"{c} RRP exVAT", f"{c} RRP incVAT"] for c in selected_countries if f"{c} Landed" in st.session_state.sku_df.columns], [])
 
 # Displayed DF
