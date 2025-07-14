@@ -40,11 +40,13 @@ if "df" not in st.session_state:
 if "df_backup" not in st.session_state:
     st.session_state.df_backup = None
 
-# Backup
-if recalculate:
-    st.session_state.df_backup = st.session_state.df.copy()
+# Local variable
+df = st.session_state.df.copy()
 
-    df = st.session_state.df.copy()
+# Backup and Recalculate
+if recalculate:
+    st.session_state.df_backup = df.copy()
+
     df["Landed Cost (£)"] = df["Factory Cost (£)"] + df["Shipping (£)"]
     df["Commission (£)"] = df["Landed Cost (£)"] * (commission_percent / 100)
     df["Post-Commission (£)"] = df["Landed Cost (£)"] + df["Commission (£)"]
@@ -64,11 +66,14 @@ if recalculate:
 
     st.session_state.df = df.copy()
 
+# Undo
 if undo and st.session_state.df_backup is not None:
     st.session_state.df = st.session_state.df_backup.copy()
 
+# Refresh df
+df = st.session_state.df.copy()
+
 # Display table
-df = st.session_state.df
 st.markdown("### 📦 SKU Pricing Table")
 st.dataframe(df.style.format({
     "Factory Cost (£)": "£{:.2f}",
@@ -85,7 +90,10 @@ st.dataframe(df.style.format({
 
 # Summary
 st.markdown("### 🧾 Summary")
-total_profit = df["Profit per Unit (£)"].sum()
-avg_profit = df["Profit per Unit (£)"].mean()
-st.success(f"Average Profit per SKU: £{avg_profit:.2f}")
-st.info(f"Total Combined Profit: £{total_profit:.2f}")
+if "Profit per Unit (£)" in df.columns:
+    total_profit = df["Profit per Unit (£)"].sum()
+    avg_profit = df["Profit per Unit (£)"].mean()
+    st.success(f"Average Profit per SKU: £{avg_profit:.2f}")
+    st.info(f"Total Combined Profit: £{total_profit:.2f}")
+else:
+    st.warning("Please click 'Recalculate' to generate pricing data.")
