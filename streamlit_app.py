@@ -37,12 +37,12 @@ for country in countries:
             "monthly_costs": ads + bank + ops + ware + pack + cour
         }
 
-# Base SKU data (editable columns)
-sku_columns = [
+# Base SKU data (for initial load)
+base_columns = [
     "Category", "SKU", "Length_mm", "Width_mm", "Depth_mm",
     "Factory_Cost_ZAR", "Export_Cost_ZAR", "Commission_%"
 ]
-sku_data = [
+initial_data = [
     ["Alpha", "ASC608", 152, 203, 20, 16.79, 21.60, 33],
     ["Alpha", "ASC1012", 255, 305, 20, 31.86, 40.97, 33],
     ["Alpha", "ASC1014", 255, 355, 20, 35.22, 45.29, 33],
@@ -54,29 +54,17 @@ sku_data = [
     ["Alpha", "ASC2430", 610, 762, 20, 99.56, 128.04, 33],
 ]
 
-# Use session state for the DF
+# Session state for DF persistence
 if "sku_df" not in st.session_state:
-    st.session_state.sku_df = pd.DataFrame(sku_data, columns=sku_columns)
+    st.session_state.sku_df = pd.DataFrame(initial_data, columns=base_columns)
 
-# Get edited DF from data_editor (this triggers on edits)
-edited_df = st.data_editor(
-    st.session_state.sku_df,
-    use_container_width=True,
-    num_rows="dynamic",
-    disabled=["Volume_m³"] + [f"{c} Landed" for c in countries if country_toggle[c]] + 
-    [f"{c} RRP exVAT" for c in countries if country_toggle[c]] + 
-    [f"{c} RRP incVAT" for c in countries if country_toggle[c]]
-)
+# Calculate volume and pricing on current DF (auto before display)
+st.session_state.sku_df["Volume_m³"] = (
+    st.session_state.sku_df["Length_mm"] * 
+    st.session_state.sku_df["Width_mm"] * 
+    st.session_state.sku_df["Depth_mm"]
+) / 1_000_000_000
 
-# Auto-update session state with edits and recalculate
-st.session_state.sku_df = edited_df.copy()  # Persist edits
-
-# Calculate Volume (auto on every run)
-st.session_state.sku_df["Volume_m³"] = (st.session_state.sku_df["Length_mm"] * 
-                                        st.session_state.sku_df["Width_mm"] * 
-                                        st.session_state.sku_df["Depth_mm"]) / 1_000_000_000
-
-# Auto-recalculate pricing
 for country in countries:
     if country_toggle[country]:
         rate = country_settings[country]["rate"]
@@ -101,13 +89,16 @@ for country in countries:
         st.session_state.sku_df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
         st.session_state.sku_df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
 
-# Re-display the updated DF (to show calcs immediately)
-st.data_editor(
+# Display single editor with calculated DF
+edited_df = st.data_editor(
     st.session_state.sku_df,
     use_container_width=True,
     num_rows="dynamic",
     disabled=["Volume_m³"] + [f"{c} Landed" for c in countries if country_toggle[c]] + 
-    [f"{c} RRP exVAT" for c in countries if country_toggle[c]] + 
-    [f"{c} RRP incVAT" for c in countries if country_toggle[c]],
-    hide_index=True  # Optional: Cleaner look
+              [f"{c} RRP exVAT" for c in countries if country_toggle[c]] + 
+              [f"{c} RRP incVAT" for c in countries if country_toggle[c]],
+    hide_index=True
 )
+
+# Update session state with only base edits (strip calculated for next run)
+st.session_state.sku_df = edited_df[base_columns]
