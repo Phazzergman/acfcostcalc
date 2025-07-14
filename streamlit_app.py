@@ -37,6 +37,12 @@ for country in countries:
             "monthly_costs": ads + bank + ops + ware + pack + cour
         }
 
+# Actions buttons always in sidebar
+st.sidebar.header("Actions")
+recalc_button = st.sidebar.button("Recalculate")
+save_button = st.sidebar.button("Save Changes")
+undo_button = st.sidebar.button("Undo")
+
 # Base columns
 base_columns = [
     "Category", "SKU", "Length_mm", "Width_mm", "Depth_mm",
@@ -64,18 +70,16 @@ if "sku_df" not in st.session_state:
         ], columns=base_columns)
     st.session_state.history = []  # For undo
 
-# Buttons in sidebar for actions
-st.sidebar.header("Actions")
-recalc_button = st.sidebar.button("Recalculate")
-save_button = st.sidebar.button("Save Changes")
-undo_button = st.sidebar.button("Undo")
+# Initial recalc on load if no calculated columns
+if "Volume_m³" not in st.session_state.sku_df.columns:
+    recalculate()
 
 # Function to recalc
 def recalculate():
-    df = st.session_state.sku_df
+    df = st.session_state.sku_df.copy()
     df["Volume_m³"] = (df["Length_mm"] * df["Width_mm"] * df["Depth_mm"]) / 1_000_000_000
     for country in countries:
-        if country_toggle[country]:
+        if country_toggle[country] and country in country_settings:
             rate = country_settings[country]["rate"]
             vat = country_settings[country]["vat"]
             monthly = country_settings[country]["monthly_costs"]
@@ -96,21 +100,18 @@ def recalculate():
 
 # Handle buttons
 if recalc_button:
-    # Push to history before recalc
     st.session_state.history.append(st.session_state.sku_df[base_columns].copy())
     if len(st.session_state.history) > 5:
         st.session_state.history.pop(0)
     recalculate()
 
 if save_button:
-    # Save base to CSV
     st.session_state.sku_df[base_columns].to_csv(file_path, index=False)
     st.success("Changes saved to sku_data.csv!")
 
 if undo_button and st.session_state.history:
-    # Revert to last history
     st.session_state.sku_df[base_columns] = st.session_state.history.pop()
-    recalculate()  # Recalc after undo
+    recalculate()
     st.success("Undone to previous state!")
 
 # Display the editor
@@ -124,5 +125,5 @@ edited_df = st.data_editor(
     hide_index=True
 )
 
-# Persist edits to base columns (for next rerun without buttons)
+# Persist edits to base columns
 st.session_state.sku_df[base_columns] = edited_df[base_columns]
