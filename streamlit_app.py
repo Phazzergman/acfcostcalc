@@ -43,7 +43,7 @@ sku_columns = [
     "Factory_Cost_ZAR", "Export_Cost_ZAR", "Commission_%"
 ]
 sku_data = [
-    ["Alpha", "ASC68", 152, 203, 20, 16.79, 21.60, 33],
+    ["Alpha", "ASC608", 152, 203, 20, 16.79, 21.60, 33],
     ["Alpha", "ASC1012", 255, 305, 20, 31.86, 40.97, 33],
     ["Alpha", "ASC1014", 255, 355, 20, 35.22, 45.29, 33],
     ["Alpha", "ASC1216", 305, 406, 20, 42.99, 55.28, 33],
@@ -65,11 +65,21 @@ for country in countries:
         vat = country_settings[country]["vat"]
         monthly = country_settings[country]["monthly_costs"]
         vol_total = country_settings[country]["container_volume"]
+        cont_cost = country_settings[country]["container_cost"]
 
+        # Overhead cost load per item (in local currency)
         cost_load = (monthly / vol_total) * sku_df["Volume_m³"] * duration_months
-        commission_factor = 1 + (sku_df["Commission_%"] / 100)
 
-        landed = sku_df["Export_Cost_ZAR"] + cost_load
+        # Shipping per item (in ZAR, fixed - not multiplied by duration)
+        shipping_ZAR = cont_cost * sku_df["Volume_m³"] / vol_total
+
+        # Total costs in ZAR
+        total_ZAR = sku_df["Factory_Cost_ZAR"] + sku_df["Export_Cost_ZAR"] + shipping_ZAR
+
+        # Convert to local and add overheads
+        landed = (total_ZAR / rate) + cost_load
+
+        commission_factor = 1 + (sku_df["Commission_%"] / 100)
         rrp_exvat = landed * commission_factor
         rrp_incvat = rrp_exvat * (1 + vat)
 
