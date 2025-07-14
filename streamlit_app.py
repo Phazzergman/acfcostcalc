@@ -97,9 +97,8 @@ def recalculate():
             df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
     st.session_state.sku_df = df
 
-# Initial recalc on load
-if "Volume_m³" not in st.session_state.sku_df.columns:
-    recalculate()
+# Recalc always after settings (to handle toggle changes)
+recalculate()
 
 # Handle buttons
 if recalc_button:
@@ -120,13 +119,13 @@ if undo_button and st.session_state.history:
 # Selected countries
 selected_countries = [c for c in countries if country_toggle[c]]
 
-# Displayed columns (base + volume + selected country columns)
+# Displayed columns
 displayed_columns = base_columns + ["Volume_m³"] + sum([[f"{c} Landed", f"{c} RRP exVAT", f"{c} RRP incVAT"] for c in selected_countries if f"{c} Landed" in st.session_state.sku_df.columns], [])
 
 # Displayed DF
 displayed_df = st.session_state.sku_df[displayed_columns].copy()
 
-# Editor on displayed DF
+# Editor
 edited_df = st.data_editor(
     displayed_df,
     use_container_width=True,
@@ -135,28 +134,28 @@ edited_df = st.data_editor(
     hide_index=True
 )
 
-# Persist edits to full DF (only base columns)
+# Persist edits
 st.session_state.sku_df[base_columns] = edited_df[base_columns]
 
-# Optional CSS for color-coding headers (UK blue, USA red, Germany green)
+# CSS for color coding
 st.markdown("""
 <style>
-div[data-testid="column"] > div > div > div > div > div > label {
+div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p {
   font-weight: bold;
 }
-div[data-testid="column"] > div > div > div > div > div > label[title="UK Landed"], 
-div[data-testid="column"] > div > div > div > div > div > label[title="UK RRP exVAT"], 
-div[data-testid="column"] > div > div > div > div > div > label[title="UK RRP incVAT"] {
+div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="UK Landed"], 
+div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="UK RRP exVAT"], 
+div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="UK RRP incVAT"] {
   color: blue;
 }
-div[data-testid="column"] > div > div > div > div > div > label[title="USA Landed"], 
-div[data-testid="column"] > div > div > div > div > div > label[title="USA RRP exVAT"], 
-div[data-testid="column"] > div > div > div > div > div > label[title="USA RRP incVAT"] {
+div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="USA Landed"], 
+div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="USA RRP exVAT"], 
+div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="USA RRP incVAT"] {
   color: red;
 }
-div[data-testid="column"] > div > div > div > div > div > label[title="Germany Landed"], 
-div[data-testid="column"] > div > div > div > div > div > label[title="Germany RRP exVAT"], 
-div[data-testid="column"] > div > div > div > div > div > label[title="Germany RRP incVAT"] {
+div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="Germany Landed"], 
+div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="Germany RRP exVAT"], 
+div.stDataFrame div[data-testid="stHorizontalBlock"] > div > div > div > p[title="Germany RRP incVAT"] {
   color: green;
 }
 </style>
