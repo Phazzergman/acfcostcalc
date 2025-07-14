@@ -21,20 +21,31 @@ if "uk_history" not in st.session_state:
 
 # ---------- Sidebar Settings ----------
 st.sidebar.header("UK Settings")
-uk_rate = st.sidebar.number_input("Exchange Rate (ZAR → GBP)", value=st.session_state.get("uk_rate", 19.0), key="uk_rate")
-uk_vat = st.sidebar.number_input("VAT % (e.g. 20 for 20%)", value=st.session_state.get("uk_vat", 20.0), key="uk_vat") / 100
-uk_months = st.sidebar.number_input("Sell-Through Duration (Months)", 1, 24, st.session_state.get("uk_months", 6), key="uk_months")
+
+st.sidebar.number_input("Exchange Rate (ZAR → GBP)", key="uk_rate", value=19.0)
+st.sidebar.number_input("VAT % (e.g. 20 for 20%)", key="uk_vat", value=20.0)
+st.sidebar.number_input("Sell-Through Duration (Months)", 1, 24, key="uk_months", value=6)
 
 st.sidebar.header("Monthly Costs")
-uk_ads = st.sidebar.number_input("Advertising", value=st.session_state.get("uk_ads", 3000.0), key="uk_ads")
-uk_bank = st.sidebar.number_input("Banking", value=st.session_state.get("uk_bank", 2000.0), key="uk_bank")
-uk_ops = st.sidebar.number_input("Ops Cost", value=st.session_state.get("uk_ops", 4000.0), key="uk_ops")
-uk_ware = st.sidebar.number_input("Warehousing", value=st.session_state.get("uk_ware", 10000.0), key="uk_ware")
-uk_pack = st.sidebar.number_input("Packing", value=st.session_state.get("uk_pack", 6000.0), key="uk_pack")
-uk_cour = st.sidebar.number_input("Courier", value=st.session_state.get("uk_cour", 7000.0), key="uk_cour")
+st.sidebar.number_input("Advertising", key="uk_ads", value=3000.0)
+st.sidebar.number_input("Banking", key="uk_bank", value=2000.0)
+st.sidebar.number_input("Ops Cost", key="uk_ops", value=4000.0)
+st.sidebar.number_input("Warehousing", key="uk_ware", value=10000.0)
+st.sidebar.number_input("Packing", key="uk_pack", value=6000.0)
+st.sidebar.number_input("Courier", key="uk_cour", value=7000.0)
 
+# 👉 Now extract usable values like this:
+uk_rate = st.session_state.uk_rate
+uk_vat = st.session_state.uk_vat / 100
+uk_months = st.session_state.uk_months
 
-monthly_total = uk_ads + uk_bank + uk_ops + uk_ware + uk_pack + uk_cour
+uk_ads = st.session_state.uk_ads
+uk_bank = st.session_state.uk_bank
+uk_ops = st.session_state.uk_ops
+uk_ware = st.session_state.uk_ware
+uk_pack = st.session_state.uk_pack
+uk_cour = st.session_state.uk_cour
+
 
 # ---------- Recalculation Function ----------
 def recalc_uk():
