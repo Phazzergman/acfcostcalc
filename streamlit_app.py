@@ -5,7 +5,7 @@ import pandas as pd
 st.set_page_config(page_title="📦 ACF SKU Pricing Intelligence Dashboard", layout="wide")
 st.title("📦 ACF SKU Pricing Intelligence Dashboard")
 
-# Buttons in main page
+# Top Buttons
 col1, col2, col3 = st.columns(3)
 with col1:
     recalc_button = st.button("Recalculate")
@@ -14,7 +14,7 @@ with col2:
 with col3:
     undo_button = st.button("Undo")
 
-# Sidebar country toggle
+# Sidebar Country Toggle
 st.sidebar.header("Toggle Countries")
 countries = ["UK", "USA", "Germany"]
 country_toggle = {c: st.sidebar.checkbox(c, value=(c == "UK")) for c in countries}
@@ -35,23 +35,22 @@ for country in countries:
             ware = st.number_input(f"{country} Warehousing (Monthly)", value=10000.0, key=f"ware_{country}")
             pack = st.number_input(f"{country} Packing (Monthly)", value=6000.0, key=f"pack_{country}")
             cour = st.number_input(f"{country} Courier (Monthly)", value=7000.0, key=f"cour_{country}")
-
         country_settings[country] = {
             "rate": rate,
             "vat": vat,
             "monthly_costs": ads + bank + ops + ware + pack + cour
         }
 
-# Base columns (removed Category)
+# Base columns (no Category)
 base_columns = [
     "SKU", "Length_mm", "Width_mm", "Depth_mm",
     "Factory_Cost_ZAR", "Export_Cost_ZAR", "Commission_%"
 ]
 
-# File for persistence
+# Local file persistence
 file_path = "sku_data.csv"
 
-# Load from file or initial (removed Category from initial data)
+# Load or start fresh
 if "sku_df" not in st.session_state:
     try:
         st.session_state.sku_df = pd.read_csv(file_path)
@@ -67,33 +66,38 @@ if "sku_df" not in st.session_state:
             ["ASC2024", 501, 610, 20, 78.14, 100.49, 33],
             ["ASC2430", 610, 762, 20, 99.56, 128.04, 33],
         ], columns=base_columns)
-    st.session_state.history = []  # For undo
+    st.session_state.history = []
 
-# Define recalc function
+# Recalculate function
 def recalculate():
     df = st.session_state.sku_df.copy()
     df["Volume_m³"] = (df["Length_mm"] * df["Width_mm"] * df["Depth_mm"]) / 1_000_000_000
+
+    total_volume_sum = df["Volume_m³"].sum()
+
     for country in countries:
         if country_toggle[country] and country in country_settings:
             rate = country_settings[country]["rate"]
             vat = country_settings[country]["vat"]
             monthly = country_settings[country]["monthly_costs"]
 
-            cost_load = (monthly / df["Volume_m³"].sum()) * df["Volume_m³"] * duration_months  # Adjusted for no container volume
-            total_ZAR = df["Factory_Cost_ZAR"] + df["Export_Cost_ZAR"]  # Removed shipping
+            cost_load = (monthly / total_volume_sum) * df["Volume_m³"] * duration_months
+            total_ZAR = df["Factory_Cost_ZAR"] + df["Export_Cost_ZAR"]
             landed = (total_ZAR / rate) + cost_load
             commission_factor = 1 + (df["Commission_%"] / 100)
             rrp_exvat = landed * commission_factor
             rrp_incvat = rrp_exvat * (1 + vat)
+
             df[f"{country} Landed"] = landed.round(2)
             df[f"{country} RRP exVAT"] = rrp_exvat.round(2)
             df[f"{country} RRP incVAT"] = rrp_incvat.round(2)
+
     st.session_state.sku_df = df
 
-# Recalc always after settings
+# Always recalc on load
 recalculate()
 
-# Handle buttons
+# Button actions
 if recalc_button:
     st.session_state.history.append(st.session_state.sku_df[base_columns].copy())
     if len(st.session_state.history) > 5:
@@ -109,23 +113,28 @@ if undo_button and st.session_state.history:
     recalculate()
     st.success("Undone to previous state!")
 
-# Selected countries
+# Country selection and final display
 selected_countries = [c for c in countries if country_toggle[c]]
+displayed_columns = base_columns + ["Volume_m³"] + sum([
+    [f"{c} Landed", f"{c} RRP exVAT", f"{c} RRP incVAT"]
+    for c in selected_countries
+    if f"{c} Landed" in st.session_state.sku_df.columns
+], [])
 
-# Displayed columns (removed Category)
-displayed_columns = base_columns + ["Volume_m³"] + sum([[f"{c} Landed", f"{c} RRP exVAT", f"{c} RRP incVAT"] for c in selected_countries if f"{c} Landed" in st.session_state.sku_df.columns], [])
-
-# Displayed DF
-displayed_df = st.session_state.sku_df[displayed_columns].copy()
-
-# Editor
+# Show editable table
 edited_df = st.data_editor(
-    displayed_df,
+    st.session_state.sku_df[displayed_columns],
     use_container_width=True,
     num_rows="dynamic",
-    disabled=["Volume_m³"] + sum([[f"{c} Landed", f"{c} RRP exVAT", f"{c} RRP incVAT"] for c in selected_countries], []),
+    disabled=["Volume_m³"] + [
+        f"{c} Landed" for c in selected_countries
+    ] + [
+        f"{c} RRP exVAT" for c in selected_countries
+    ] + [
+        f"{c} RRP incVAT" for c in selected_countries
+    ],
     hide_index=True
 )
 
-# Persist edits
+# Save changes live
 st.session_state.sku_df[base_columns] = edited_df[base_columns]
